@@ -1,10 +1,12 @@
 import unittest
 import random
 import numpy.testing as npt
-from network import *
-
+from pydl.network import *
 
 class TestNetwork(unittest.TestCase):
+    def setUp(self):
+        random.seed(0)
+
     def test_2_2_2_network(self):
         network = Network([2, 2, 2])
         network.layers[0].weights = numpy.array([[0.15, 0.20],

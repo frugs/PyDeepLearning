@@ -1,7 +1,7 @@
 import functools
 import numpy
-import iterutils
-import mathutils
+from . import iterutils
+from . import mathutils
 
 class Network:
     class Layer:
