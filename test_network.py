@@ -3,6 +3,7 @@ import random
 import numpy.testing as npt
 from pydl.network import *
 
+
 class TestNetwork(unittest.TestCase):
     def setUp(self):
         random.seed(0)
@@ -50,7 +51,8 @@ class TestNetwork(unittest.TestCase):
         training_target = numpy.array([[0.5]])
 
         for _ in range(10000):
-            weight_and_bias_deltas = network.compute_weight_and_bias_deltas(training_input, training_target,
+            weight_and_bias_deltas = network.compute_weight_and_bias_deltas(training_input,
+                                                                            training_target,
                                                                             learning_rate)
             network.apply_weight_and_bias_deltas(weight_and_bias_deltas)
 
@@ -83,7 +85,9 @@ class TestNetwork(unittest.TestCase):
                                              [0.0080132]]),
                                 numpy.array([[0.042730]])]
 
-        weight_deltas, bias_deltas = zip(*network.compute_weight_and_bias_deltas(training_input, training_target, learning_rate))
+        weight_deltas, bias_deltas = zip(*network.compute_weight_and_bias_deltas(training_input,
+                                                                                 training_target,
+                                                                                 learning_rate))
 
         for weight_delta, expected_weight_delta in zip(weight_deltas, expected_weight_deltas):
             npt.assert_almost_equal(weight_delta, expected_weight_delta, 5)
@@ -127,9 +131,9 @@ class TestNetwork(unittest.TestCase):
 
             npt.assert_array_less(post_training_error, pre_training_error)
 
-        for training_input, training_target in zip(training_inputs, training_targets):
-            error = network.compute_error(training_input, training_target)
-            npt.assert_array_less(error, 0.05)
+        errors = [network.compute_error(test_input, test_target) for test_input, test_target in training_set]
+        mean_squared_error = numpy.mean(numpy.square(errors))
+        npt.assert_array_less(mean_squared_error, 0.05)
 
     def test_iris_data_set(self):
         def create_data_entry(line):
