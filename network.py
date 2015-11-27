@@ -36,7 +36,7 @@ class Network:
 
     def compute_error(self, input, expectation):
         output = self.compute_outputs(input)[-1]
-        return numpy.sum((expectation - output) ** 2) * 0.5
+        return numpy.sum((expectation - output) ** 2) / expectation.shape[0]
 
     def compute_weight_and_bias_deltas(self, input, expectation, learning_rate):
         def calculate_derror_by_dactivation(layer, current_layer_output, derror_by_doutput):

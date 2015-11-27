@@ -111,12 +111,13 @@ class TestNetwork(unittest.TestCase):
 
         training_set = list(zip(training_inputs, training_targets))
 
-        for _ in range(50000):
-            training_input, training_target = training_set[random.randrange(0, len(training_inputs))]
+        for _ in range(10000):
+            training_input, training_target = training_set[random.randrange(0, len(training_set))]
 
             pre_training_error = network.compute_error(training_input, training_target)
 
-            weight_and_bias_deltas = network.compute_weight_and_bias_deltas(training_input, training_target,
+            weight_and_bias_deltas = network.compute_weight_and_bias_deltas(training_input,
+                                                                            training_target,
                                                                             learning_rate)
             network.apply_weight_and_bias_deltas(weight_and_bias_deltas)
 
@@ -127,3 +128,36 @@ class TestNetwork(unittest.TestCase):
         for training_input, training_target in zip(training_inputs, training_targets):
             error = network.compute_error(training_input, training_target)
             npt.assert_array_less(error, 0.05)
+
+    def test_iris_data_set(self):
+        def create_data_entry(line):
+            split = line.strip().split(",")
+            data_input = numpy.array([[float(str) for str in split[:-1]]]).transpose()
+
+            classes = ["Iris-setosa", "Iris-versicolor", "Iris-virginica"]
+            data_target = numpy.array([[float(split[-1] == class_) for class_ in classes]]).transpose()
+
+            return data_input, data_target
+
+        iris_data_file = open("iris.data")
+        data_set = [create_data_entry(line) for line in iris_data_file.readlines() if line.strip()]
+        iris_data_file.close()
+        random.shuffle(data_set)
+
+        training_set = data_set[:-30]
+        test_set = data_set[-30:]
+
+        network = Network([4, 50, 3])
+        learning_rate = 0.5
+
+        for _ in range(10000):
+            training_input, training_target = training_set[random.randrange(0, len(training_set))]
+
+            weight_and_bias_deltas = network.compute_weight_and_bias_deltas(training_input,
+                                                                            training_target,
+                                                                            learning_rate)
+            network.apply_weight_and_bias_deltas(weight_and_bias_deltas)
+
+        errors = [network.compute_error(test_input, test_target) for test_input, test_target in test_set]
+        mean_squared_error = numpy.mean(numpy.square(errors))
+        npt.assert_array_less(mean_squared_error, 0.05)
