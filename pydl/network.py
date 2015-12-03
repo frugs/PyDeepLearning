@@ -5,9 +5,9 @@ from . import mathutils
 
 class Network:
     class Layer:
-        def __init__(self, inputSize, layerSize):
-            self.weights = numpy.random.uniform(-1.0, 1.0, (layerSize, inputSize))
-            self.bias = numpy.random.uniform(-1.0, 1.0, (layerSize, 1))
+        def __init__(self, input_size, layer_size):
+            self.weights = numpy.random.uniform(-1.0, 1.0, (layer_size, input_size))
+            self.bias = numpy.random.uniform(-1.0, 1.0, (layer_size, 1))
             self.activationFunc = mathutils.sigmoid
             self.activationFuncDerivative = mathutils.sigmoid_prime
 
@@ -26,17 +26,17 @@ class Network:
         def dactivation_by_dbias(self):
             return numpy.ones(self.bias.shape)
 
-    def __init__(self, layerSizes):
-        self.layers = [Network.Layer(inputSize, layerSize) for inputSize, layerSize in iterutils.window(layerSizes, 2)] 
+    def __init__(self, layer_sizes):
+        self.layers = [Network.Layer(inputSize, layerSize) for inputSize, layerSize in iterutils.window(layer_sizes, 2)]
 
     def compute_outputs(self, input):
         compute_and_accumulate_layer_outputs = (
             lambda prev_layer_outputs, layer: prev_layer_outputs + [layer.compute_output(prev_layer_outputs[-1])])
         return functools.reduce(compute_and_accumulate_layer_outputs, self.layers, [input])
 
-    def compute_error(self, input, expectation):
-        output = self.compute_outputs(input)[-1]
-        return numpy.sum((expectation - output) ** 2) / expectation.shape[0]
+    def compute_error(self, test_input, test_expectation):
+        output = self.compute_outputs(test_input)[-1]
+        return numpy.sum((test_expectation - output) ** 2) / test_expectation.shape[0]
 
     def compute_weight_and_bias_deltas(self, input, expectation, learning_rate):
         def calculate_derror_by_dactivation(layer, current_layer_output, derror_by_doutput):
@@ -77,3 +77,19 @@ class Network:
         for layer, (layer_weight_delta, layer_bias_delta) in zip(self.layers, weight_and_bias_deltas):
             layer.weights = layer.weights - layer_weight_delta
             layer.bias = layer.bias - layer_bias_delta
+
+    def save(self, file):
+        arrays = functools.reduce(lambda acc, layer: acc + [layer.weights, layer.bias], self.layers, [])
+        numpy.savez_compressed(file, *arrays)
+
+    def load(self, file):
+        def create_layer(weights, bias):
+            layer = Network.Layer(0, 0)
+            layer.weights = weights
+            layer.bias = bias
+            return layer
+
+        with numpy.load(file) as data:
+            self.layers = [create_layer(data["arr_%d" % i], data["arr_%d" % (i + 1)])
+                           for i
+                           in range(0, len(data.items()), 2)]

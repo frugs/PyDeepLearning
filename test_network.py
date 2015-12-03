@@ -1,5 +1,7 @@
 import unittest
 import random
+import tempfile
+import os
 import numpy.testing as npt
 from pydl.network import *
 
@@ -167,3 +169,31 @@ class TestNetwork(unittest.TestCase):
         errors = [network.compute_error(test_input, test_target) for test_input, test_target in test_set]
         mean_squared_error = numpy.mean(numpy.square(errors))
         npt.assert_array_less(mean_squared_error, 0.05)
+
+    def test_save_and_load(self):
+        network = Network([2, 3, 4])
+        network.layers[0].weights = numpy.array([[1, 1],
+                                                 [0, -1],
+                                                 [5, -9]])
+        network.layers[0].bias = numpy.array([[0], [0], [1]])
+        network.layers[1].weights = numpy.array([[2, 7, -4],
+                                                 [0, -1, 1],
+                                                 [6, 20, -10],
+                                                 [3, 3, 3, 3]])
+        network.layers[1].bias = numpy.array([[9], [1], [-1], [50]])
+
+        temp_file = tempfile.mkstemp(suffix=".npz")[1]
+        network.save(temp_file)
+
+        loaded_network = Network([])
+        loaded_network.load(temp_file)
+
+        for original_layer, loaded_layer in zip(network.layers, loaded_network.layers):
+            npt.assert_equal(loaded_layer.weights, original_layer.weights)
+            npt.assert_equal(loaded_layer.bias, original_layer.bias)
+
+        os.remove(temp_file)
+
+
+
+
