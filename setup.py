@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='PyDeepLearning',
-    version='0.1.1',
+    version='0.1.2',
     packages=['pydl'],
     url='https://github.com/frugs/PyDeepLearning',
     license='MIT',
@@ -12,5 +12,5 @@ setup(
     classifiers=['Development Status :: 3 - Alpha',
                  'License :: OSI Approved :: MIT License',
                  'Programming Language :: Python :: 3'],
-    requires=['numpy']
+    install_requires=['numpy']
 )
