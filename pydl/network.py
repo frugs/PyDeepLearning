@@ -3,6 +3,7 @@ import numpy
 from . import iterutils
 from . import mathutils
 
+
 class Network:
     class Layer:
         def __init__(self, input_size, layer_size):
@@ -29,10 +30,10 @@ class Network:
     def __init__(self, layer_sizes):
         self.layers = [Network.Layer(inputSize, layerSize) for inputSize, layerSize in iterutils.window(layer_sizes, 2)]
 
-    def compute_outputs(self, input):
+    def compute_outputs(self, network_input):
         compute_and_accumulate_layer_outputs = (
             lambda prev_layer_outputs, layer: prev_layer_outputs + [layer.compute_output(prev_layer_outputs[-1])])
-        return functools.reduce(compute_and_accumulate_layer_outputs, self.layers, [input])
+        return functools.reduce(compute_and_accumulate_layer_outputs, self.layers, [network_input])
 
     def compute_error(self, test_input, test_expectation):
         output = self.compute_outputs(test_input)[-1]
@@ -54,9 +55,12 @@ class Network:
         output_layer = self.layers[-1]
 
         output_layer_derror_by_doutput = output_layer.output_layer_derror_by_doutput(expectation, outputs)
-        output_layer_derror_by_dactivation = calculate_derror_by_dactivation(output_layer, outputs[-1], output_layer_derror_by_doutput)
+        output_layer_derror_by_dactivation = calculate_derror_by_dactivation(output_layer, outputs[-1],
+                                                                             output_layer_derror_by_doutput)
         
-        weight_and_bias_deltas = [calculate_weight_and_bias_deltas(output_layer, outputs[-2], output_layer_derror_by_dactivation)]
+        weight_and_bias_deltas = [calculate_weight_and_bias_deltas(output_layer,
+                                                                   outputs[-2],
+                                                                   output_layer_derror_by_dactivation)]
         derror_by_dactivations = [output_layer_derror_by_dactivation]
 
         for index in reversed(range(len(self.layers[:-1]))):
@@ -64,9 +68,13 @@ class Network:
             dnext_layer_activation_by_doutput = self.layers[index + 1].weights.transpose()
             
             derror_by_doutput = dnext_layer_activation_by_doutput.dot(next_layer_derror_by_dactivation)
-            derror_by_dactivation = calculate_derror_by_dactivation(self.layers[index], outputs[index + 1], derror_by_doutput)
+            derror_by_dactivation = calculate_derror_by_dactivation(self.layers[index],
+                                                                    outputs[index + 1],
+                                                                    derror_by_doutput)
 
-            weight_and_bias_delta = calculate_weight_and_bias_deltas(self.layers[index], outputs[index], derror_by_dactivation)
+            weight_and_bias_delta = calculate_weight_and_bias_deltas(self.layers[index],
+                                                                     outputs[index],
+                                                                     derror_by_dactivation)
             
             weight_and_bias_deltas = [weight_and_bias_delta] + weight_and_bias_deltas
             derror_by_dactivations = [derror_by_dactivation] + derror_by_dactivations
@@ -78,18 +86,18 @@ class Network:
             layer.weights = layer.weights - layer_weight_delta
             layer.bias = layer.bias - layer_bias_delta
 
-    def save(self, file):
+    def save(self, file_name):
         arrays = functools.reduce(lambda acc, layer: acc + [layer.weights, layer.bias], self.layers, [])
-        numpy.savez_compressed(file, *arrays)
+        numpy.savez_compressed(file_name, *arrays)
 
-    def load(self, file):
+    def load(self, file_name):
         def create_layer(weights, bias):
             layer = Network.Layer(0, 0)
             layer.weights = weights
             layer.bias = bias
             return layer
 
-        with numpy.load(file) as data:
+        with numpy.load(file_name) as data:
             self.layers = [create_layer(data["arr_%d" % i], data["arr_%d" % (i + 1)])
                            for i
                            in range(0, len(data.items()), 2)]
