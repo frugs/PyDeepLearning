@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='PyDeepLearning',
-    version='0.1.2',
+    version='0.2.0',
     packages=['pydl'],
     url='https://github.com/frugs/PyDeepLearning',
     license='MIT',

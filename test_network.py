@@ -2,8 +2,9 @@ import unittest
 import random
 import tempfile
 import os
+import numpy
 import numpy.testing as npt
-from pydl.network import *
+from pydl import Network
 
 
 class TestNetwork(unittest.TestCase):
