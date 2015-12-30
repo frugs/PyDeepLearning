@@ -1,4 +1,5 @@
 import unittest
+import time
 import numpy as np
 from pydl import NoOutputLstm
 
@@ -148,6 +149,28 @@ class TestNoOutputLstm(unittest.TestCase):
         result = n.activate(to_char_vector_sequence("infer"), np.zeros(len(index_to_word)))
         self.assertEquals(index_to_word[np.argmax(result)], "infer")
 
+    def test_training_performance(self):
+        times = []
+        for _ in range(1000):
+            n = NoOutputLstm(100, 80)
+            xs = np.asarray([np.random.standard_normal(100),
+                             np.random.standard_normal(100),
+                             np.random.standard_normal(100),
+                             np.random.standard_normal(100),
+                             np.random.standard_normal(100),
+                             np.random.standard_normal(100),
+                             np.random.standard_normal(100),
+                             np.random.standard_normal(100)])
+            h0 = np.random.standard_normal(80)
+            t = np.random.standard_normal(80)
+
+            start = time.time()
+            n.train(xs, h0, t, 0.1)
+            end = time.time()
+
+            times.append(end - start)
+
+        print(str(len(times)) + " training epochs took " + str(sum(times)) + " seconds")
 
 if __name__ == '__main__':
     unittest.main()
