@@ -1,18 +1,20 @@
+import random
+import functools
 import numpy as np
 from .mathutils import sigmoid, sigmoid_prime, tanh_prime
 
 
 class NoOutputLstm:
-    def __init__(self, input_size: int, hidden_size: int):
-        self.w_xf_g = np.random.randn(input_size, hidden_size)
-        self.w_hf_g = np.random.randn(hidden_size, hidden_size)
-        self.b_f_g = np.random.standard_normal(hidden_size)
-        self.w_xi_g = np.random.randn(input_size, hidden_size)
-        self.w_hi_g = np.random.randn(hidden_size, hidden_size)
-        self.b_i_g = np.random.standard_normal(hidden_size)
-        self.w_xc = np.random.randn(input_size, hidden_size)
-        self.w_hc = np.random.randn(hidden_size, hidden_size)
-        self.b_c = np.random.standard_normal(hidden_size)
+    def __init__(self, input_size: int, hidden_size: int, gpu=False):
+        self.w_xf_g = np.random.randn(input_size, hidden_size).astype(np.float32)
+        self.w_hf_g = np.random.randn(hidden_size, hidden_size).astype(np.float32)
+        self.b_f_g = np.random.standard_normal(hidden_size).astype(np.float32)
+        self.w_xi_g = np.random.randn(input_size, hidden_size).astype(np.float32)
+        self.w_hi_g = np.random.randn(hidden_size, hidden_size).astype(np.float32)
+        self.b_i_g = np.random.standard_normal(hidden_size).astype(np.float32)
+        self.w_xc = np.random.randn(input_size, hidden_size).astype(np.float32)
+        self.w_hc = np.random.randn(hidden_size, hidden_size).astype(np.float32)
+        self.b_c = np.random.standard_normal(hidden_size).astype(np.float32)
 
     def clone(self):
         clone = NoOutputLstm(0, 0)
@@ -25,7 +27,7 @@ class NoOutputLstm:
         clone.w_xc = np.copy(self.w_xc)
         clone.w_hc = np.copy(self.w_hc)
         clone.b_c = np.copy(self.b_c)
-
+        clone.gpu = self.gpu
         return clone
 
     def _step(self, x, h_prev):
@@ -122,3 +124,24 @@ class NoOutputLstm:
         self.w_xc -= dw_xc * learning_rate
         self.w_hc -= dw_hc * learning_rate
         self.b_c -= db_c * learning_rate
+
+    def train_from_data(self, training_data, learning_rate, workers=1, epochs=1):
+        for _ in range(epochs):
+            def compute_deltas(training_example):
+                xs, h0, t = training_example
+                hs, f_gs, i_gs, cs, h = self._forward_prop(xs, h0)
+                dh = h - t
+                return self._back_prop(xs, hs, f_gs, i_gs, cs, dh)
+
+            deltas = map(compute_deltas, random.sample(training_data, workers))
+
+            for dw_xf_g, dw_hf_g, db_f_g, dw_xi_g, dw_hi_g, db_i_g, dw_xc, dw_hc, db_c in deltas:
+                self.w_xf_g -= dw_xf_g * learning_rate
+                self.w_hf_g -= dw_hf_g * learning_rate
+                self.b_f_g -= db_f_g * learning_rate
+                self.w_xi_g -= dw_xi_g * learning_rate
+                self.w_hi_g -= dw_hi_g * learning_rate
+                self.b_i_g -= db_i_g * learning_rate
+                self.w_xc -= dw_xc * learning_rate
+                self.w_hc -= dw_hc * learning_rate
+                self.b_c -= db_c * learning_rate

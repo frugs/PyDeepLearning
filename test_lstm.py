@@ -150,27 +150,28 @@ class TestNoOutputLstm(unittest.TestCase):
         self.assertEquals(index_to_word[np.argmax(result)], "infer")
 
     def test_training_performance(self):
-        times = []
-        for _ in range(1000):
-            n = NoOutputLstm(100, 80)
-            xs = np.asarray([np.random.standard_normal(100),
-                             np.random.standard_normal(100),
-                             np.random.standard_normal(100),
-                             np.random.standard_normal(100),
-                             np.random.standard_normal(100),
-                             np.random.standard_normal(100),
-                             np.random.standard_normal(100),
-                             np.random.standard_normal(100)])
-            h0 = np.random.standard_normal(80)
-            t = np.random.standard_normal(80)
+        n = NoOutputLstm(100, 80, gpu=False)
+        training_data = []
+        for _ in range(30):
+            xs = np.asarray([np.random.standard_normal(100).astype(np.float32),
+                             np.random.standard_normal(100).astype(np.float32),
+                             np.random.standard_normal(100).astype(np.float32),
+                             np.random.standard_normal(100).astype(np.float32),
+                             np.random.standard_normal(100).astype(np.float32),
+                             np.random.standard_normal(100).astype(np.float32),
+                             np.random.standard_normal(100).astype(np.float32),
+                             np.random.standard_normal(100).astype(np.float32)])
+            h0 = np.random.standard_normal(80).astype(np.float32)
+            t = np.random.standard_normal(80).astype(np.float32)
+            training_data.append((xs, h0, t))
 
-            start = time.time()
-            n.train(xs, h0, t, 0.1)
-            end = time.time()
+        epochs = 100
+        start = time.time()
+        n.train_from_data(training_data, 0.1, workers=10, epochs=epochs)
+        end = time.time()
+        time_taken = end - start
 
-            times.append(end - start)
-
-        print(str(len(times)) + " training epochs took " + str(sum(times)) + " seconds")
+        print(str(epochs) + " training epochs took " + str(time_taken) + " seconds")
 
 if __name__ == '__main__':
     unittest.main()
