@@ -1,20 +1,19 @@
 import random
-import functools
 import numpy as np
 from .mathutils import sigmoid, sigmoid_prime, tanh_prime
 
 
 class NoOutputLstm:
-    def __init__(self, input_size: int, hidden_size: int, gpu=False):
-        self.w_xf_g = np.random.randn(input_size, hidden_size).astype(np.float32)
-        self.w_hf_g = np.random.randn(hidden_size, hidden_size).astype(np.float32)
-        self.b_f_g = np.random.standard_normal(hidden_size).astype(np.float32)
-        self.w_xi_g = np.random.randn(input_size, hidden_size).astype(np.float32)
-        self.w_hi_g = np.random.randn(hidden_size, hidden_size).astype(np.float32)
-        self.b_i_g = np.random.standard_normal(hidden_size).astype(np.float32)
-        self.w_xc = np.random.randn(input_size, hidden_size).astype(np.float32)
-        self.w_hc = np.random.randn(hidden_size, hidden_size).astype(np.float32)
-        self.b_c = np.random.standard_normal(hidden_size).astype(np.float32)
+    def __init__(self, input_size: int, hidden_size: int):
+        self.w_xf_g = np.random.rand(input_size, hidden_size).astype(np.float32)
+        self.w_hf_g = np.random.rand(hidden_size, hidden_size).astype(np.float32)
+        self.b_f_g = np.random.rand(hidden_size).astype(np.float32)
+        self.w_xi_g = np.random.rand(input_size, hidden_size).astype(np.float32)
+        self.w_hi_g = np.random.rand(hidden_size, hidden_size).astype(np.float32)
+        self.b_i_g = np.random.rand(hidden_size).astype(np.float32)
+        self.w_xc = np.random.rand(input_size, hidden_size).astype(np.float32)
+        self.w_hc = np.random.rand(hidden_size, hidden_size).astype(np.float32)
+        self.b_c = np.random.rand(hidden_size).astype(np.float32)
 
     def clone(self):
         clone = NoOutputLstm(0, 0)
@@ -27,7 +26,6 @@ class NoOutputLstm:
         clone.w_xc = np.copy(self.w_xc)
         clone.w_hc = np.copy(self.w_hc)
         clone.b_c = np.copy(self.b_c)
-        clone.gpu = self.gpu
         return clone
 
     def _step(self, x, h_prev):
@@ -38,7 +36,7 @@ class NoOutputLstm:
 
         return h, f_g, i_g, c
 
-    def _forward_prop(self, xs, h0):
+    def forward_prop(self, xs, h0):
         hs, f_gs, i_gs, cs = [], [], [], []
         h = h0
         for i, x in enumerate(xs):
@@ -78,7 +76,7 @@ class NoOutputLstm:
 
         return dw_xf_g, dw_hf_g, db_f_g, dw_xi_g, dw_hi_g, db_i_g, dw_xc, dw_hc, db_c, dh_prev
 
-    def _back_prop(self, xs, hs, f_gs, i_gs, cs, dh_last):
+    def back_prop(self, xs, hs, f_gs, i_gs, cs, dh_last):
         delta_w_xf_g = np.zeros(self.w_xf_g.shape)
         delta_w_hf_g = np.zeros(self.w_hf_g.shape)
         delta_b_f_g = np.zeros(self.b_f_g.shape)
@@ -108,13 +106,13 @@ class NoOutputLstm:
         return delta_w_xf_g, delta_w_hf_g, delta_b_f_g, delta_w_xi_g, delta_w_hi_g, delta_b_i_g, delta_w_xc, delta_w_hc, delta_b_c
 
     def activate(self, xs, h0):
-        _, _, _, _, h = self._forward_prop(xs, h0)
+        _, _, _, _, h = self.forward_prop(xs, h0)
         return h
 
     def train(self, xs, h0, t, learning_rate):
-        hs, f_gs, i_gs, cs, h = self._forward_prop(xs, h0)
+        hs, f_gs, i_gs, cs, h = self.forward_prop(xs, h0)
         dh = h - t
-        dw_xf_g, dw_hf_g, db_f_g, dw_xi_g, dw_hi_g, db_i_g, dw_xc, dw_hc, db_c = self._back_prop(xs, hs, f_gs, i_gs, cs, dh)
+        dw_xf_g, dw_hf_g, db_f_g, dw_xi_g, dw_hi_g, db_i_g, dw_xc, dw_hc, db_c = self.back_prop(xs, hs, f_gs, i_gs, cs, dh)
         self.w_xf_g -= dw_xf_g * learning_rate
         self.w_hf_g -= dw_hf_g * learning_rate
         self.b_f_g -= db_f_g * learning_rate
@@ -125,15 +123,15 @@ class NoOutputLstm:
         self.w_hc -= dw_hc * learning_rate
         self.b_c -= db_c * learning_rate
 
-    def train_from_data(self, training_data, learning_rate, workers=1, epochs=1):
+    def train_from_data(self, training_data, learning_rate, epochs=1):
         for _ in range(epochs):
             def compute_deltas(training_example):
                 xs, h0, t = training_example
-                hs, f_gs, i_gs, cs, h = self._forward_prop(xs, h0)
+                hs, f_gs, i_gs, cs, h = self.forward_prop(xs, h0)
                 dh = h - t
-                return self._back_prop(xs, hs, f_gs, i_gs, cs, dh)
+                return self.back_prop(xs, hs, f_gs, i_gs, cs, dh)
 
-            deltas = map(compute_deltas, random.sample(training_data, workers))
+            deltas = map(compute_deltas, random.sample(training_data, min(len(training_data), 10)))
 
             for dw_xf_g, dw_hf_g, db_f_g, dw_xi_g, dw_hi_g, db_i_g, dw_xc, dw_hc, db_c in deltas:
                 self.w_xf_g -= dw_xf_g * learning_rate

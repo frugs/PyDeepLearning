@@ -75,8 +75,8 @@ class TestNoOutputLstm(unittest.TestCase):
         h0 = np.random.randn(5)
 
         n = NoOutputLstm(x_size, len(h0))
-        hs, f_gs, i_gs, cs, _ = n._forward_prop(xs, h0)
-        dw_xf_g, dw_hf_g, db_f_g, dw_xi_g, dw_hi_g, db_i_g, dw_xc, dw_hc, db_c = n._back_prop(xs, hs, f_gs, i_gs, cs, np.ones(h0.shape))
+        hs, f_gs, i_gs, cs, _ = n.forward_prop(xs, h0)
+        dw_xf_g, dw_hf_g, db_f_g, dw_xi_g, dw_hi_g, db_i_g, dw_xc, dw_hc, db_c = n.back_prop(xs, hs, f_gs, i_gs, cs, np.ones(h0.shape))
 
         def grad_check(attribute, numerical_gradient):
             for i in np.ndindex(numerical_gradient.shape):
@@ -86,8 +86,8 @@ class TestNoOutputLstm(unittest.TestCase):
                 neg_n = n.clone()
                 getattr(neg_n, attribute)[i] -= t
 
-                _, _, _, _, plus_h_next = plus_n._forward_prop(xs, h0)
-                _, _, _, _, neg_h_next = neg_n._forward_prop(xs, h0)
+                _, _, _, _, plus_h_next = plus_n.forward_prop(xs, h0)
+                _, _, _, _, neg_h_next = neg_n.forward_prop(xs, h0)
                 exp_grad = np.sum((plus_h_next - neg_h_next) / (2 * t))
                 num_grad = numerical_gradient[i]
 
@@ -147,27 +147,27 @@ class TestNoOutputLstm(unittest.TestCase):
                 print(total_err/len(index_to_word))
 
         result = n.activate(to_char_vector_sequence("infer"), np.zeros(len(index_to_word)))
-        self.assertEquals(index_to_word[np.argmax(result)], "infer")
+        self.assertEquals("infer", index_to_word[np.argmax(result)])
 
     def test_training_performance(self):
-        n = NoOutputLstm(100, 80, gpu=False)
+        n = NoOutputLstm(100, 80)
         training_data = []
         for _ in range(30):
-            xs = np.asarray([np.random.standard_normal(100).astype(np.float32),
-                             np.random.standard_normal(100).astype(np.float32),
-                             np.random.standard_normal(100).astype(np.float32),
-                             np.random.standard_normal(100).astype(np.float32),
-                             np.random.standard_normal(100).astype(np.float32),
-                             np.random.standard_normal(100).astype(np.float32),
-                             np.random.standard_normal(100).astype(np.float32),
-                             np.random.standard_normal(100).astype(np.float32)])
-            h0 = np.random.standard_normal(80).astype(np.float32)
-            t = np.random.standard_normal(80).astype(np.float32)
+            xs = np.asarray([np.random.rand(100),
+                             np.random.rand(100),
+                             np.random.rand(100),
+                             np.random.rand(100),
+                             np.random.rand(100),
+                             np.random.rand(100),
+                             np.random.rand(100),
+                             np.random.rand(100)])
+            h0 = np.random.rand(80).astype(np.float32)
+            t = np.random.rand(80).astype(np.float32)
             training_data.append((xs, h0, t))
 
-        epochs = 100
+        epochs = 300
         start = time.time()
-        n.train_from_data(training_data, 0.1, workers=10, epochs=epochs)
+        n.train_from_data(training_data, 0.1, epochs=epochs)
         end = time.time()
         time_taken = end - start
 
