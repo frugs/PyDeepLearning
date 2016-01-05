@@ -4,15 +4,15 @@ import tempfile
 import os
 import numpy
 import numpy.testing as npt
-from pydl import Network
+from pydl import FeedForwardNetwork
 
 
-class TestNetwork(unittest.TestCase):
+class TestFeedForwardNetwork(unittest.TestCase):
     def setUp(self):
         random.seed(0)
 
     def test_2_2_2_network(self):
-        network = Network([2, 2, 2])
+        network = FeedForwardNetwork([2, 2, 2])
         network.layers[0].weights = numpy.array([[0.15, 0.20],
                                                  [0.25, 0.30]])
         network.layers[0].bias = numpy.array([[0.35], [0.35]])
@@ -41,7 +41,7 @@ class TestNetwork(unittest.TestCase):
         npt.assert_almost_equal(network.layers[1].weights, expected_weights[1])
 
     def test_2_2_1_network_learning(self):
-        network = Network([2, 2, 1])
+        network = FeedForwardNetwork([2, 2, 1])
         network.layers[0].weights = numpy.array([[0.1, 0.8],
                                                  [0.4, 0.6]])
         network.layers[0].bias = numpy.array([[0], [0]])
@@ -63,7 +63,7 @@ class TestNetwork(unittest.TestCase):
         npt.assert_array_less(error, 0.05)
 
     def test_2_2_1_network_xor(self):
-        network = Network([2, 2, 1])
+        network = FeedForwardNetwork([2, 2, 1])
         network.layers[0].weights = numpy.array([[0.129952, -0.923123],
                                                  [0.570345, -0.328932]])
         network.layers[0].bias = numpy.array([[0.341232], [-0.115234]])
@@ -99,7 +99,7 @@ class TestNetwork(unittest.TestCase):
             npt.assert_almost_equal(bias_delta, expected_bias_delta, 5)
 
     def test_xor_function_learning_with_2_2_1_network(self):
-        network = Network([2, 2, 1])
+        network = FeedForwardNetwork([2, 2, 1])
         network.layers[0].weights = numpy.array([[0.129952, -0.923123],
                                                  [0.570345, -0.328932]])
         network.layers[0].bias = numpy.array([[0.341232], [-0.115234]])
@@ -156,7 +156,7 @@ class TestNetwork(unittest.TestCase):
         training_set = data_set[:-30]
         test_set = data_set[-30:]
 
-        network = Network([4, 50, 3])
+        network = FeedForwardNetwork([4, 50, 3])
         learning_rate = 0.5
 
         for _ in range(10000):
@@ -172,7 +172,7 @@ class TestNetwork(unittest.TestCase):
         npt.assert_array_less(mean_squared_error, 0.05)
 
     def test_save_and_load(self):
-        network = Network([2, 3, 4])
+        network = FeedForwardNetwork([2, 3, 4])
         network.layers[0].weights = numpy.array([[1, 1],
                                                  [0, -1],
                                                  [5, -9]])
@@ -186,7 +186,7 @@ class TestNetwork(unittest.TestCase):
         temp_file = tempfile.mkstemp(suffix=".npz")[1]
         network.save(temp_file)
 
-        loaded_network = Network([])
+        loaded_network = FeedForwardNetwork([])
         loaded_network.load(temp_file)
 
         for original_layer, loaded_layer in zip(network.layers, loaded_network.layers):
