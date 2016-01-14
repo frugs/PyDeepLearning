@@ -1,150 +1,146 @@
-import unittest
+import os
 import random
 import tempfile
-import os
-import numpy
+import unittest
+import numpy as np
 import numpy.testing as npt
-from pydl import FeedForwardNetwork
+from pydl.feedforwardnetwork import FeedForwardNetwork
+from pydl import mathutils
+
+
+def clone(n):
+    n2 = FeedForwardNetwork([9, 9])
+    n2.ws = [np.copy(w) for w in n.ws]
+    n2.bs = [np.copy(b) for b in n.bs]
+    return n2
+
+
+def err(y):
+    return mathutils.mean_squared_error(y, np.zeros(y.shape))
 
 
 class TestFeedForwardNetwork(unittest.TestCase):
-    def setUp(self):
-        random.seed(0)
+    def test_grad_ws(self):
+        n = FeedForwardNetwork([5, 4, 3, 2])
+        x0 = np.random.uniform(size=5).astype("float32")
 
-    def test_2_2_2_network(self):
-        network = FeedForwardNetwork([2, 2, 2])
-        network.layers[0].weights = numpy.array([[0.15, 0.20],
-                                                 [0.25, 0.30]])
-        network.layers[0].bias = numpy.array([[0.35], [0.35]])
-        network.layers[1].weights = numpy.array([[0.40, 0.45],
-                                                 [0.50, 0.55]])
-        network.layers[1].bias = numpy.array([[0.60], [0.60]])
+        res = {}
+        y = n.y(x0, res)
+        t = np.zeros(2).astype("float32")
+        dy = mathutils.mean_squared_error_prime(y, t)
 
-        learning_rate = 0.5
+        dws = n.dws(x0, dy, res)
 
-        training_input = numpy.array([[0.05], [0.1]])
-        training_target = numpy.array([[0.01], [0.99]])
-        outputs = network.compute_outputs(training_input)
-        expected_output = numpy.array([[0.75136507], [0.772928465]])
+        delta = 1e-4
 
-        npt.assert_almost_equal(outputs[-1], expected_output)
+        exp_dws = []
+        for i in range(len(n.ws)):
+            w = n.ws[i]
+            exp_dw = np.zeros(w.shape)
+            for index in np.ndindex(w.shape):
+                n1 = clone(n)
+                n2 = clone(n)
 
-        weight_and_bias_deltas = network.compute_weight_and_bias_deltas(training_input, training_target, learning_rate)
-        network.apply_weight_and_bias_deltas(weight_and_bias_deltas)
+                n1.ws[i][index] -= delta
+                n2.ws[i][index] += delta
 
-        expected_weights = [numpy.array([[0.149780716, 0.19956143],
-                                         [0.24975114, 0.29950229]]),
-                            numpy.array([[0.35891648, 0.408666186],
-                                         [0.511301270, 0.561370121]])]
+                exp_grad = (err(n2.y(x0, {})) - err(n1.y(x0, {}))) / (2 * delta)
+                exp_dw[index] = exp_grad
 
-        npt.assert_almost_equal(network.layers[0].weights, expected_weights[0])
-        npt.assert_almost_equal(network.layers[1].weights, expected_weights[1])
+            exp_dws.append(exp_dw)
 
-    def test_2_2_1_network_learning(self):
-        network = FeedForwardNetwork([2, 2, 1])
-        network.layers[0].weights = numpy.array([[0.1, 0.8],
-                                                 [0.4, 0.6]])
-        network.layers[0].bias = numpy.array([[0], [0]])
-        network.layers[1].weights = numpy.array([[0.3, 0.9]])
-        network.layers[1].bias = numpy.array([[0]])
+        for dw, exp_dw in zip(dws, exp_dws):
+            npt.assert_array_almost_equal(dw, exp_dw, decimal=3)
 
-        learning_rate = 0.5
+    def test_grad_bs(self):
+        n = FeedForwardNetwork([4, 7, 2, 3])
+        x0 = np.random.uniform(size=4).astype("float32")
 
-        training_input = numpy.array([[0.35], [0.9]])
-        training_target = numpy.array([[0.5]])
+        res = {}
+        y = n.y(x0, res)
+        t = np.zeros(3).astype("float32")
+        dy = mathutils.mean_squared_error_prime(y, t)
 
-        for _ in range(10000):
-            weight_and_bias_deltas = network.compute_weight_and_bias_deltas(training_input,
-                                                                            training_target,
-                                                                            learning_rate)
-            network.apply_weight_and_bias_deltas(weight_and_bias_deltas)
+        dbs = n.dbs(x0, dy, res)
 
-        error = network.compute_error(training_input, training_target)
-        npt.assert_array_less(error, 0.05)
+        delta = 1e-4
 
-    def test_2_2_1_network_xor(self):
-        network = FeedForwardNetwork([2, 2, 1])
-        network.layers[0].weights = numpy.array([[0.129952, -0.923123],
-                                                 [0.570345, -0.328932]])
-        network.layers[0].bias = numpy.array([[0.341232], [-0.115234]])
-        network.layers[1].weights = numpy.array([[0.164732, 0.752621]])
-        network.layers[1].bias = numpy.array([[-0.993423]])
+        exp_dbs = []
+        for i in range(len(n.bs)):
+            b = n.bs[i]
+            exp_db = np.zeros(b.shape)
+            for index in np.ndindex(b.shape):
+                n1 = clone(n)
+                n2 = clone(n)
 
-        learning_rate = 0.5
+                n1.bs[i][index] -= delta
+                n2.bs[i][index] += delta
 
-        training_input = numpy.array([[0], [0]])
-        training_target = numpy.array([[0]])
+                exp_grad = (err(n2.y(x0, {})) - err(n1.y(x0, {}))) / (2 * delta)
+                exp_db[index] = exp_grad
 
-        expected_output = numpy.array([[0.367610]])
-        outputs = network.compute_outputs(training_input)
+            exp_dbs.append(exp_db)
 
-        npt.assert_almost_equal(outputs[-1], expected_output, 4)
+        for dw, exp_db in zip(dbs, exp_dbs):
+            npt.assert_array_almost_equal(dw, exp_db, decimal=3)
 
-        expected_weight_deltas = [numpy.array([[0, 0],
-                                               [0, 0]]),
-                                  numpy.array([[0.024975, 0.020135]])]
+    def test_grad_x(self):
+        n = FeedForwardNetwork([3, 4, 4, 2])
+        x0 = np.random.uniform(size=3).astype("float32")
 
-        expected_bias_deltas = [numpy.array([[0.0017095],
-                                             [0.0080132]]),
-                                numpy.array([[0.042730]])]
+        res = {}
+        y = n.y(x0, res)
+        t = np.zeros(2).astype("float32")
+        dy = mathutils.mean_squared_error_prime(y, t)
+        dx = n.dx(x0, dy, res)
 
-        weight_deltas, bias_deltas = zip(*network.compute_weight_and_bias_deltas(training_input,
-                                                                                 training_target,
-                                                                                 learning_rate))
+        delta = 1e-4
 
-        for weight_delta, expected_weight_delta in zip(weight_deltas, expected_weight_deltas):
-            npt.assert_almost_equal(weight_delta, expected_weight_delta, 5)
+        exp_dx = np.zeros(x0.shape)
+        for index in np.ndindex(x0.shape):
+            x0_a = np.copy(x0)
+            x0_b = np.copy(x0)
 
-        for bias_delta, expected_bias_delta in zip(bias_deltas, expected_bias_deltas):
-            npt.assert_almost_equal(bias_delta, expected_bias_delta, 5)
+            x0_a[index] -= delta
+            x0_b[index] += delta
 
-    def test_xor_function_learning_with_2_2_1_network(self):
-        network = FeedForwardNetwork([2, 2, 1])
-        network.layers[0].weights = numpy.array([[0.129952, -0.923123],
-                                                 [0.570345, -0.328932]])
-        network.layers[0].bias = numpy.array([[0.341232], [-0.115234]])
-        network.layers[1].weights = numpy.array([[0.164732, 0.752621]])
-        network.layers[1].bias = numpy.array([[-0.993423]])
+            exp_grad = (err(n.y(x0_b, {})) - err(n.y(x0_a, {}))) / (2 * delta)
+            exp_dx[index] = exp_grad
 
-        learning_rate = 0.5
+        npt.assert_array_almost_equal(dx, exp_dx, decimal=3)
 
-        training_inputs = [numpy.array([[1], [1]]),
-                           numpy.array([[1], [0]]),
-                           numpy.array([[0], [1]]),
-                           numpy.array([[0], [0]])]
+    def test_save_and_load(self):
+        n = FeedForwardNetwork([2, 3, 4])
+        n.ws = [np.array([[1, 1],
+                          [0, -1],
+                          [5, -9]]),
+                np.array([[2, 7, -4],
+                          [0, -1, 1],
+                          [6, 20, -10],
+                          [3, 3, 3, 3]])]
 
-        training_targets = [numpy.array([[0]]),
-                            numpy.array([[1]]),
-                            numpy.array([[1]]),
-                            numpy.array([[0]])]
+        n.bs = [np.array([[0], [0], [1]]),
+                np.array([[9], [1], [-1], [50]])]
 
-        training_set = list(zip(training_inputs, training_targets))
+        temp_file = tempfile.mkstemp(suffix=".npz")[1]
+        n.save(temp_file)
 
-        for _ in range(10000):
-            training_input, training_target = training_set[random.randrange(0, len(training_set))]
+        n2 = FeedForwardNetwork([])
+        n2.load(temp_file)
 
-            pre_training_error = network.compute_error(training_input, training_target)
+        for w, b, w2, b2 in zip(n.ws, n.bs, n2.ws, n2.bs):
+            npt.assert_equal(w, w2)
+            npt.assert_equal(b, b2)
 
-            weight_and_bias_deltas = network.compute_weight_and_bias_deltas(training_input,
-                                                                            training_target,
-                                                                            learning_rate)
-            network.apply_weight_and_bias_deltas(weight_and_bias_deltas)
-
-            post_training_error = network.compute_error(training_input, training_target)
-
-            npt.assert_array_less(post_training_error, pre_training_error)
-
-        errors = [network.compute_error(test_input, test_target) for test_input, test_target in training_set]
-        mean_squared_error = numpy.mean(numpy.square(errors))
-        npt.assert_array_less(mean_squared_error, 0.05)
+        os.remove(temp_file)
 
     def test_iris_data_set(self):
         def create_data_entry(line):
             split = line.strip().split(",")
-            data_input = numpy.array([[float(str) for str in split[:-1]]]).transpose()
+            data_input = np.array([float(str) for str in split[:-1]]).astype("float32")
 
             classes = ["Iris-setosa", "Iris-versicolor", "Iris-virginica"]
-            data_target = numpy.array([[float(split[-1] == class_) for class_ in classes]]).transpose()
+            data_target = np.array([float(split[-1] == class_) for class_ in classes]).astype("float32")
 
             return data_input, data_target
 
@@ -156,45 +152,17 @@ class TestFeedForwardNetwork(unittest.TestCase):
         training_set = data_set[:-30]
         test_set = data_set[-30:]
 
-        network = FeedForwardNetwork([4, 50, 3])
-        learning_rate = 0.5
+        n = FeedForwardNetwork([4, 15, 3])
+        learning_rate = 0.1
 
         for _ in range(10000):
             training_input, training_target = training_set[random.randrange(0, len(training_set))]
+            res = {}
+            y = n.y(training_input, res)
+            dy = mathutils.mean_squared_error_prime(y, training_target)
+            n.train(learning_rate, training_input, dy, res)
 
-            weight_and_bias_deltas = network.compute_weight_and_bias_deltas(training_input,
-                                                                            training_target,
-                                                                            learning_rate)
-            network.apply_weight_and_bias_deltas(weight_and_bias_deltas)
-
-        errors = [network.compute_error(test_input, test_target) for test_input, test_target in test_set]
-        mean_squared_error = numpy.mean(numpy.square(errors))
+        errors = [mathutils.mean_squared_error(n.y(test_input, {}), test_target) for test_input, test_target in test_set]
+        mean_squared_error = np.mean(np.square(errors))
+        print(mean_squared_error)
         npt.assert_array_less(mean_squared_error, 0.05)
-
-    def test_save_and_load(self):
-        network = FeedForwardNetwork([2, 3, 4])
-        network.layers[0].weights = numpy.array([[1, 1],
-                                                 [0, -1],
-                                                 [5, -9]])
-        network.layers[0].bias = numpy.array([[0], [0], [1]])
-        network.layers[1].weights = numpy.array([[2, 7, -4],
-                                                 [0, -1, 1],
-                                                 [6, 20, -10],
-                                                 [3, 3, 3, 3]])
-        network.layers[1].bias = numpy.array([[9], [1], [-1], [50]])
-
-        temp_file = tempfile.mkstemp(suffix=".npz")[1]
-        network.save(temp_file)
-
-        loaded_network = FeedForwardNetwork([])
-        loaded_network.load(temp_file)
-
-        for original_layer, loaded_layer in zip(network.layers, loaded_network.layers):
-            npt.assert_equal(loaded_layer.weights, original_layer.weights)
-            npt.assert_equal(loaded_layer.bias, original_layer.bias)
-
-        os.remove(temp_file)
-
-
-
-

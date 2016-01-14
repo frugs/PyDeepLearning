@@ -1,109 +1,147 @@
-import functools
-import numpy
+from collections import namedtuple
+
+import theano
+import theano.tensor as T
+import numpy as np
 from . import iterutils
-from . import mathutils
+# import iterutils
+
+
+def farray(arr):
+    return np.array(arr).astype("float32")
+
+
+def frand(size=None):
+    return np.random.uniform(size=size).astype("float32")
+
+
+t_x, t_b = T.fvectors("x", "b")
+t_w = T.fmatrix("w")
+
+t_activation = T.dot(t_x, t_w) + t_b
+t_y = 1 / (1 + T.exp(-t_activation))
+
+tf_activate = theano.function(inputs=[t_x, t_w, t_b], outputs=[t_y])
+
+t_w2, t_x2 = T.fmatrices("w2", "x2")
+t_dy, t_sigmoid = T.fvectors("dy", "sigmoid")
+t_sigmoid_prime = t_sigmoid * (1 - t_sigmoid)
+t_dw = t_dy * t_sigmoid_prime * t_x2
+t_db = t_dy * t_sigmoid_prime
+t_dx = T.dot(t_w2, t_dy * t_sigmoid_prime)
+
+tf_dw = theano.function(inputs=[t_dy, t_sigmoid, t_x2], outputs=[t_dw])
+tf_db = theano.function(inputs=[t_dy, t_sigmoid], outputs=[t_db])
+tf_dx = theano.function(inputs=[t_dy, t_sigmoid, t_w2], outputs=[t_dx])
 
 
 class FeedForwardNetwork:
-    class Layer:
-        def __init__(self, input_size, layer_size):
-            self.weights = numpy.random.uniform(-1.0, 1.0, (layer_size, input_size))
-            self.bias = numpy.random.uniform(-1.0, 1.0, (layer_size, 1))
-            self.activationFunc = mathutils.sigmoid
-            self.activationFuncDerivative = mathutils.sigmoid_prime
-
-        def compute_output(self, input):
-            return self.activationFunc(self.weights.dot(input) + self.bias)
-
-        def output_layer_derror_by_doutput(self, expectation, outputs):
-            return outputs[-1] - expectation
-
-        def doutput_by_dactivation(self, layer_output):
-            return self.activationFuncDerivative(layer_output)
-
-        def dactivation_by_dweight(self, previous_layer_output):
-            return previous_layer_output.transpose()
-
-        def dactivation_by_dbias(self):
-            return numpy.ones(self.bias.shape)
-
     def __init__(self, layer_sizes):
-        self.layers = [FeedForwardNetwork.Layer(inputSize, layerSize) for inputSize, layerSize in iterutils.window(layer_sizes, 2)]
+        self.ws = [frand(size=(x_size, y_size)) for x_size, y_size in iterutils.window(layer_sizes, 2)]
+        self.bs = [frand(size=y_size) for _, y_size in iterutils.window(layer_sizes, 2)]
 
-    def compute_outputs(self, network_input):
-        compute_and_accumulate_layer_outputs = (
-            lambda prev_layer_outputs, layer: prev_layer_outputs + [layer.compute_output(prev_layer_outputs[-1])])
-        return functools.reduce(compute_and_accumulate_layer_outputs, self.layers, [network_input])
+    def y(self, x0, intermediate_results):
+        if "ys" not in intermediate_results:
+            ys = []
+            x = x0
 
-    def compute_error(self, test_input, test_expectation):
-        output = self.compute_outputs(test_input)[-1]
-        return numpy.sum((test_expectation - output) ** 2) / test_expectation.shape[0]
+            for w, b in zip(self.ws, self.bs):
+                y = tf_activate(x, w, b)[0]
+                ys.append(y)
+                x = y
 
-    def back_prop(self, network_input, expectation):
-        def calculate_derror_by_dactivation(layer, current_layer_output, derror_by_doutput):
-            return layer.doutput_by_dactivation(current_layer_output) * derror_by_doutput
+            intermediate_results["ys"] = ys
 
-        def calculate_layer_weight_and_bias_gradients(layer, previous_layer_output, derror_by_dactivation):
-            dactivation_by_dweight = layer.dactivation_by_dweight(previous_layer_output)
-            dactivation_by_dbias = layer.dactivation_by_dbias()
+        return intermediate_results["ys"][-1]
 
-            weight_gradients = derror_by_dactivation * dactivation_by_dweight
-            bias_gradients = derror_by_dactivation * dactivation_by_dbias
-            return (weight_gradients, bias_gradients)
+    def dy(self, x0, t, intermediate_results):
+        if "dy" not in intermediate_results:
+            y = self.y(x0, intermediate_results)
+            intermediate_results["dy"] = y - t
 
-        layer_outputs = self.compute_outputs(network_input)
-        output_layer = self.layers[-1]
+        return intermediate_results["dy"]
 
-        output_layer_derror_by_doutput = output_layer.output_layer_derror_by_doutput(expectation, layer_outputs)
-        output_layer_derror_by_dactivation = calculate_derror_by_dactivation(output_layer,
-                                                                             layer_outputs[-1],
-                                                                             output_layer_derror_by_doutput)
+    def dws(self, x0, dy, intermediate_results):
+        if "dws" not in intermediate_results:
+            dws = []
+            ys = intermediate_results["ys"]
+            xs = [x0] + ys[:-1]
 
-        weight_and_bias_gradients = [calculate_layer_weight_and_bias_gradients(output_layer,
-                                                                               layer_outputs[-2],
-                                                                               output_layer_derror_by_dactivation)]
-        derror_by_dactivations = [output_layer_derror_by_dactivation]
+            self.dx(x0, dy, intermediate_results)
+            dxs = intermediate_results["dxs"]
+            dys = dxs[1:] + [dy]
 
-        for index in reversed(range(len(self.layers[:-1]))):
-            next_layer_derror_by_dactivation = derror_by_dactivations[0]
-            dnext_layer_activation_by_doutput = self.layers[index + 1].weights.transpose()
+            for x, w, y, dy in reversed(list(zip(xs, self.ws, ys, dys))):
+                x2 = np.expand_dims(x, axis=1)
 
-            derror_by_doutput = dnext_layer_activation_by_doutput.dot(next_layer_derror_by_dactivation)
-            derror_by_dactivation = calculate_derror_by_dactivation(self.layers[index],
-                                                                    layer_outputs[index + 1],
-                                                                    derror_by_doutput)
+                dw = tf_dw(dy, y, x2.repeat(len(y), axis=1))[0]
+                dws.append(dw)
 
-            layer_weight_and_bias_gradients = calculate_layer_weight_and_bias_gradients(self.layers[index],
-                                                                                  layer_outputs[index],
-                                                                                  derror_by_dactivation)
+            dws.reverse()
+            intermediate_results["dws"] = dws
 
-            weight_and_bias_gradients = [layer_weight_and_bias_gradients] + weight_and_bias_gradients
-            derror_by_dactivations = [derror_by_dactivation] + derror_by_dactivations
+        return intermediate_results["dws"]
 
-        derror_by_dnetwork_input = self.layers[0].weights.T.dot(derror_by_dactivations[0])
-        return derror_by_dnetwork_input, weight_and_bias_gradients
+    def dbs(self, x0, dy, intermediate_results):
+        if "dbs" not in intermediate_results:
+            dbs = []
+            ys = intermediate_results["ys"]
 
-    def compute_weight_and_bias_deltas(self, network_input, expectation, learning_rate):
-        _, weight_and_bias_gradients = self.back_prop(network_input, expectation)
-        return [(weight * learning_rate, bias * learning_rate) for weight, bias in weight_and_bias_gradients]
+            self.dx(x0, dy, intermediate_results)
+            dxs = intermediate_results["dxs"]
+            dys = dxs[1:] + [dy]
 
-    def apply_weight_and_bias_deltas(self, weight_and_bias_deltas):
-        for layer, (layer_weight_delta, layer_bias_delta) in zip(self.layers, weight_and_bias_deltas):
-            layer.weights = layer.weights - layer_weight_delta
-            layer.bias = layer.bias - layer_bias_delta
+            for w, y, dy in reversed(list(zip(self.ws, ys, dys))):
+                db = tf_db(dy, y)[0]
+                dbs.append(db)
+
+            dbs.reverse()
+            intermediate_results["dbs"] = dbs
+
+        return intermediate_results["dbs"]
+
+    def dx(self, x0, dy, intermediate_results):
+        if "dxs" not in intermediate_results:
+            dxs = []
+            ys = intermediate_results["ys"]
+
+            for w, y in reversed(list(zip(self.ws, ys))):
+                dy = tf_dx(dy, y, w)[0]
+                dxs.append(dy)
+
+            dxs.reverse()
+            intermediate_results["dxs"] = dxs
+
+        return intermediate_results["dxs"][0]
+
+    def train(self, learning_rate, x0, dy, intermediate_results):
+        dws = self.dws(x0, dy, intermediate_results)
+        dbs = self.dbs(x0, dy, intermediate_results)
+        intermediate_results.clear()
+
+        for w, dw in zip(self.ws, dws):
+            w -= dw * learning_rate
+
+        for b, db in zip(self.bs, dbs):
+            b -= db * learning_rate
+
+    def train_from_results(self, learning_rate, intermediate_results):
+        self.train(learning_rate, None, None, intermediate_results)
 
     def save(self, file_name):
-        arrays = functools.reduce(lambda acc, layer: acc + [layer.weights, layer.bias], self.layers, [])
-        numpy.savez_compressed(file_name, *arrays)
+        arrays = []
+        for w, b in zip(self.ws, self.bs):
+            arrays.append(w)
+            arrays.append(b)
+        np.savez_compressed(file_name, *arrays)
 
     def load(self, file_name):
-        def create_layer(weights, bias):
-            layer = FeedForwardNetwork.Layer(0, 0)
-            layer.weights = weights
-            layer.bias = bias
-            return layer
+        self.ws = []
+        self.bs = []
 
-        with numpy.load(file_name) as data:
-            self.layers = [create_layer(data["arr_%d" % i], data["arr_%d" % (i + 1)])
-                           for i
-                           in range(0, len(data.items()), 2)]
+        with np.load(file_name) as data:
+            for i in range(0, len(data.items()), 2):
+                self.ws.append(data["arr_%d" % i])
+                self.bs.append(data["arr_%d" % (i + 1)])
+
+

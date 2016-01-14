@@ -11,3 +11,11 @@ def sigmoid_prime(y):
 
 def tanh_prime(y):
     return 1 - np.square(y)
+
+
+def mean_squared_error(y, t):
+    return 0.5 * np.sum(np.square(t - y))
+
+
+def mean_squared_error_prime(y, t):
+    return y - t
