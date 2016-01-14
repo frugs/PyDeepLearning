@@ -7,6 +7,8 @@ import numpy.testing as npt
 from pydl.feedforwardnetwork import FeedForwardNetwork
 from pydl import mathutils
 
+TYPE = "float64"
+
 
 def clone(n):
     n2 = FeedForwardNetwork([9, 9])
@@ -22,11 +24,11 @@ def err(y):
 class TestFeedForwardNetwork(unittest.TestCase):
     def test_grad_ws(self):
         n = FeedForwardNetwork([5, 4, 3, 2])
-        x0 = np.random.uniform(size=5).astype("float32")
+        x0 = np.random.uniform(size=5).astype(TYPE)
 
         res = {}
         y = n.y(x0, res)
-        t = np.zeros(2).astype("float32")
+        t = np.zeros(2).astype(TYPE)
         dy = mathutils.mean_squared_error_prime(y, t)
 
         dws = n.dws(x0, dy, res)
@@ -54,11 +56,11 @@ class TestFeedForwardNetwork(unittest.TestCase):
 
     def test_grad_bs(self):
         n = FeedForwardNetwork([4, 7, 2, 3])
-        x0 = np.random.uniform(size=4).astype("float32")
+        x0 = np.random.uniform(size=4).astype(TYPE)
 
         res = {}
         y = n.y(x0, res)
-        t = np.zeros(3).astype("float32")
+        t = np.zeros(3).astype(TYPE)
         dy = mathutils.mean_squared_error_prime(y, t)
 
         dbs = n.dbs(x0, dy, res)
@@ -86,11 +88,11 @@ class TestFeedForwardNetwork(unittest.TestCase):
 
     def test_grad_x(self):
         n = FeedForwardNetwork([3, 4, 4, 2])
-        x0 = np.random.uniform(size=3).astype("float32")
+        x0 = np.random.uniform(size=3).astype(TYPE)
 
         res = {}
         y = n.y(x0, res)
-        t = np.zeros(2).astype("float32")
+        t = np.zeros(2).astype(TYPE)
         dy = mathutils.mean_squared_error_prime(y, t)
         dx = n.dx(x0, dy, res)
 
@@ -137,10 +139,10 @@ class TestFeedForwardNetwork(unittest.TestCase):
     def test_iris_data_set(self):
         def create_data_entry(line):
             split = line.strip().split(",")
-            data_input = np.array([float(str) for str in split[:-1]]).astype("float32")
+            data_input = np.array([float(str) / 7 for str in split[:-1]]).astype(TYPE)
 
             classes = ["Iris-setosa", "Iris-versicolor", "Iris-virginica"]
-            data_target = np.array([float(split[-1] == class_) for class_ in classes]).astype("float32")
+            data_target = np.array([float(split[-1] == class_) for class_ in classes]).astype(TYPE)
 
             return data_input, data_target
 
@@ -152,8 +154,8 @@ class TestFeedForwardNetwork(unittest.TestCase):
         training_set = data_set[:-30]
         test_set = data_set[-30:]
 
-        n = FeedForwardNetwork([4, 15, 3])
-        learning_rate = 0.1
+        n = FeedForwardNetwork([4, 50, 3])
+        learning_rate = 0.5
 
         for _ in range(10000):
             training_input, training_target = training_set[random.randrange(0, len(training_set))]
@@ -164,5 +166,4 @@ class TestFeedForwardNetwork(unittest.TestCase):
 
         errors = [mathutils.mean_squared_error(n.y(test_input, {}), test_target) for test_input, test_target in test_set]
         mean_squared_error = np.mean(np.square(errors))
-        print(mean_squared_error)
         npt.assert_array_less(mean_squared_error, 0.05)

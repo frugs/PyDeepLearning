@@ -3,16 +3,18 @@ from collections import namedtuple
 import theano
 import theano.tensor as T
 import numpy as np
-from . import iterutils
+from . import iterutils, mathutils
+
+
 # import iterutils
 
 
 def farray(arr):
-    return np.array(arr).astype("float32")
+    return np.array(arr).astype("float64")
 
 
 def frand(size=None):
-    return np.random.uniform(size=size).astype("float32")
+    return np.random.uniform(-1, 1, size=size).astype("float64")
 
 
 t_x, t_b = T.fvectors("x", "b")
@@ -46,7 +48,8 @@ class FeedForwardNetwork:
             x = x0
 
             for w, b in zip(self.ws, self.bs):
-                y = tf_activate(x, w, b)[0]
+                # y = tf_activate(x, w, b)[0]
+                y = mathutils.sigmoid(np.dot(x, w) + b)
                 ys.append(y)
                 x = y
 
@@ -74,7 +77,8 @@ class FeedForwardNetwork:
             for x, w, y, dy in reversed(list(zip(xs, self.ws, ys, dys))):
                 x2 = np.expand_dims(x, axis=1)
 
-                dw = tf_dw(dy, y, x2.repeat(len(y), axis=1))[0]
+                # dw = tf_dw(dy, y, x2.repeat(len(y), axis=1))[0]
+                dw = dy * mathutils.sigmoid_prime(y) * x2
                 dws.append(dw)
 
             dws.reverse()
@@ -92,7 +96,8 @@ class FeedForwardNetwork:
             dys = dxs[1:] + [dy]
 
             for w, y, dy in reversed(list(zip(self.ws, ys, dys))):
-                db = tf_db(dy, y)[0]
+                # db = tf_db(dy, y)[0]
+                db = dy * mathutils.sigmoid_prime(y)
                 dbs.append(db)
 
             dbs.reverse()
@@ -106,7 +111,8 @@ class FeedForwardNetwork:
             ys = intermediate_results["ys"]
 
             for w, y in reversed(list(zip(self.ws, ys))):
-                dy = tf_dx(dy, y, w)[0]
+                # dy = tf_dx(dy, y, w)[0]
+                dy = np.dot(w, dy * mathutils.sigmoid_prime(y))
                 dxs.append(dy)
 
             dxs.reverse()

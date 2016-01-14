@@ -14,8 +14,8 @@ def tanh_prime(y):
 
 
 def mean_squared_error(y, t):
-    return 0.5 * np.sum(np.square(t - y))
+    return 0.5 * np.sum(np.square(t - y)) * (1 / len(y))
 
 
 def mean_squared_error_prime(y, t):
-    return y - t
+    return (y - t) / len(y)
