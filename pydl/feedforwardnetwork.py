@@ -57,13 +57,6 @@ class FeedForwardNetwork:
 
         return intermediate_results["ys"][-1]
 
-    def dy(self, x0, t, intermediate_results):
-        if "dy" not in intermediate_results:
-            y = self.y(x0, intermediate_results)
-            intermediate_results["dy"] = y - t
-
-        return intermediate_results["dy"]
-
     def dws(self, x0, dy, intermediate_results):
         if "dws" not in intermediate_results:
             dws = []
@@ -130,9 +123,6 @@ class FeedForwardNetwork:
 
         for b, db in zip(self.bs, dbs):
             b -= db * learning_rate
-
-    def train_from_results(self, learning_rate, intermediate_results):
-        self.train(learning_rate, None, None, intermediate_results)
 
     def save(self, file_name):
         arrays = []

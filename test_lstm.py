@@ -1,7 +1,7 @@
 import unittest
 import time
 import numpy as np
-from pydl import NoOutputLstm
+from pydl import NoOutputLstm, mathutils
 
 
 def err(y):
@@ -143,8 +143,8 @@ class TestNoOutputLstm(unittest.TestCase):
                 total_err = 0
                 for char_vectors, word_vector in training_data:
                     h = n.activate(char_vectors, np.zeros(len(index_to_word)))
-                    total_err += np.sum(np.square(h - word_vector))
-                print(total_err/len(index_to_word))
+                    total_err += mathutils.mean_squared_error(h, word_vector)
+                print(total_err/len(training_data))
 
         result = n.activate(to_char_vector_sequence("infer"), np.zeros(len(index_to_word)))
         self.assertEquals("infer", index_to_word[np.argmax(result)])
@@ -153,16 +153,16 @@ class TestNoOutputLstm(unittest.TestCase):
         n = NoOutputLstm(100, 80)
         training_data = []
         for _ in range(30):
-            xs = np.asarray([np.random.rand(100),
-                             np.random.rand(100),
-                             np.random.rand(100),
-                             np.random.rand(100),
-                             np.random.rand(100),
-                             np.random.rand(100),
-                             np.random.rand(100),
-                             np.random.rand(100)])
-            h0 = np.random.rand(80).astype(np.float32)
-            t = np.random.rand(80).astype(np.float32)
+            xs = np.asarray([np.random.uniform(size=100),
+                             np.random.uniform(size=100),
+                             np.random.uniform(size=100),
+                             np.random.uniform(size=100),
+                             np.random.uniform(size=100),
+                             np.random.uniform(size=100),
+                             np.random.uniform(size=100),
+                             np.random.uniform(size=100)])
+            h0 = np.random.uniform(size=80)
+            t = np.random.uniform(size=80)
             training_data.append((xs, h0, t))
 
         epochs = 300
