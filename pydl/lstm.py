@@ -3,17 +3,21 @@ import numpy as np
 from .mathutils import sigmoid, sigmoid_prime, tanh_prime
 
 
+def frand(size=None):
+    return np.random.uniform(-0.2, 0.2, size=size)
+
+
 class NoOutputLstm:
     def __init__(self, input_size: int, hidden_size: int):
-        self.w_xf_g = np.random.uniform(size=(input_size, hidden_size))
-        self.w_hf_g = np.random.uniform(size=(hidden_size, hidden_size))
-        self.b_f_g = np.random.uniform(size=hidden_size)
-        self.w_xi_g = np.random.uniform(size=(input_size, hidden_size))
-        self.w_hi_g = np.random.uniform(size=(hidden_size, hidden_size))
-        self.b_i_g = np.random.uniform(size=hidden_size)
-        self.w_xc = np.random.uniform(size=(input_size, hidden_size))
-        self.w_hc = np.random.uniform(size=(hidden_size, hidden_size))
-        self.b_c = np.random.uniform(size=hidden_size)
+        self.w_xf_g = frand(size=(input_size, hidden_size))
+        self.w_hf_g = frand(size=(hidden_size, hidden_size))
+        self.b_f_g = frand(size=hidden_size)
+        self.w_xi_g = frand(size=(input_size, hidden_size))
+        self.w_hi_g = frand(size=(hidden_size, hidden_size))
+        self.b_i_g = frand(size=hidden_size)
+        self.w_xc = frand(size=(input_size, hidden_size))
+        self.w_hc = frand(size=(hidden_size, hidden_size))
+        self.b_c = frand(size=hidden_size)
 
     def clone(self):
         clone = NoOutputLstm(0, 0)
@@ -42,6 +46,7 @@ class NoOutputLstm:
 
     def forward_prop(self, xs, h0, intermediate_results):
         if "hs" not in intermediate_results:
+            intermediate_results["h0"] = h0
             intermediate_results["xs"] = xs
             intermediate_results["hs"] = []
             intermediate_results["f_gs"] = []
@@ -95,6 +100,7 @@ class NoOutputLstm:
         return dh_prev
 
     def back_prop(self, dh_last, intermediate_results):
+        h0 = intermediate_results["h0"]
         xs = intermediate_results["xs"]
         hs = intermediate_results["hs"]
         f_gs = intermediate_results["f_gs"]
@@ -112,7 +118,7 @@ class NoOutputLstm:
         intermediate_results["db_c"] = np.zeros(self.b_c.shape)
 
         dh = dh_last
-        for x, h_prev, f_g, i_g, c in reversed(list(zip(xs, hs, f_gs, i_gs, cs))):
+        for x, h_prev, f_g, i_g, c in reversed(list(zip(xs, [h0] + hs[:-1], f_gs, i_gs, cs))):
             dh_prev = self._back_step(x, h_prev, f_g, i_g, c, dh, intermediate_results)
             dh = dh_prev
 
@@ -121,9 +127,7 @@ class NoOutputLstm:
     def activate(self, xs, h0):
         return self.forward_prop(xs, h0, {})
 
-    def train(self, xs, h0, dh, learning_rate, intermediate_results):
-        self.forward_prop(xs, h0, intermediate_results)
-        self.back_prop(dh, intermediate_results)
+    def train_from_results(self, learning_rate, intermediate_results):
         self.w_xf_g -= intermediate_results["dw_xf_g"] * learning_rate
         self.w_hf_g -= intermediate_results["dw_hf_g"] * learning_rate
         self.b_f_g -= intermediate_results["db_f_g"] * learning_rate

@@ -12,6 +12,10 @@ def derr(y):
     return (2 / len(y)) * y
 
 
+def ce_err_prime(y, t):
+    return y - t
+
+
 class TestNoOutputLstm(unittest.TestCase):
     def test_single_step_gradients(self):
         t = 1e-4
@@ -26,7 +30,7 @@ class TestNoOutputLstm(unittest.TestCase):
 
         intermediate_results = {}
         h_next = n.forward_prop(xs, h0, intermediate_results)
-        dh_prev = n.back_prop(derr(h_next), intermediate_results)
+        dh0 = n.back_prop(derr(h_next), intermediate_results)
 
         def grad_check(attribute, numerical_gradient):
             for i in np.ndindex(numerical_gradient.shape):
@@ -38,7 +42,7 @@ class TestNoOutputLstm(unittest.TestCase):
 
                 plus_h_next = plus_n.forward_prop(xs, h0, {})
                 neg_h_next = neg_n.forward_prop(xs, h0, {})
-                exp_grad = np.sum((err(plus_h_next) - err(neg_h_next)) / (2 * t))
+                exp_grad = (err(plus_h_next) - err(neg_h_next)) / (2 * t)
 
                 self.assertTrue(abs(exp_grad - numerical_gradient[i]) < 0.01,
                                 "{}: {} not within threshold of {}".format(attribute, numerical_gradient[i], exp_grad))
@@ -57,30 +61,33 @@ class TestNoOutputLstm(unittest.TestCase):
         for attr, numerical_grad in checks.items():
             grad_check(attr, numerical_grad)
 
-        for i in np.ndindex(dh_prev.shape):
-            hprev_plus = np.copy(h0)
-            hprev_plus[i] += t
+        for i in np.ndindex(dh0.shape):
+            h0_plus = np.copy(h0)
+            h0_plus[i] += t
 
-            hprev_minus = np.copy(h0)
-            hprev_minus[i] -= t
+            h0_minus = np.copy(h0)
+            h0_minus[i] -= t
 
-            plus_h1 = n.forward_prop(xs, hprev_plus, {})
-            neg_h1 = n.forward_prop(xs, hprev_minus, {})
-            exp_dh_prev = ((err(plus_h1) - err(neg_h1)) / (2 * t))
+            plus_h1 = n.forward_prop(xs, h0_plus, {})
+            neg_h1 = n.forward_prop(xs, h0_minus, {})
+            exp_dh0 = ((err(plus_h1) - err(neg_h1)) / (2 * t))
 
-            self.assertTrue(abs(exp_dh_prev - dh_prev[i]) < 0.01,
-                            "dh_prev: {} not within threshold of {}".format(dh_prev[i], exp_dh_prev))
+            self.assertTrue(abs(exp_dh0 - dh0[i]) < 0.01,
+                            "dh_prev: {} not within threshold of {}".format(dh0[i], exp_dh0))
 
-    def test_prop_gradients(self):
+    def test_multi_step_gradients(self):
         t = 1e-4
 
         x_size = 4
-        xs = np.random.randn(10, x_size)
-        h0 = np.random.randn(5)
+        h_size = 5
+        xs = np.random.uniform(size=(10, x_size))
+        h0 = np.random.uniform(size=h_size)
 
-        n = NoOutputLstm(x_size, len(h0))
-        hs, f_gs, i_gs, cs, _ = n.forward_prop(xs, h0)
-        dw_xf_g, dw_hf_g, db_f_g, dw_xi_g, dw_hi_g, db_i_g, dw_xc, dw_hc, db_c = n.back_prop(xs, hs, f_gs, i_gs, cs, np.ones(h0.shape))
+        n = NoOutputLstm(x_size, h_size)
+
+        intermediate_results = {}
+        h_last = n.forward_prop(xs, h0, intermediate_results)
+        dh0 = n.back_prop(derr(h_last), intermediate_results)
 
         def grad_check(attribute, numerical_gradient):
             for i in np.ndindex(numerical_gradient.shape):
@@ -90,27 +97,42 @@ class TestNoOutputLstm(unittest.TestCase):
                 neg_n = n.clone()
                 getattr(neg_n, attribute)[i] -= t
 
-                _, _, _, _, plus_h_next = plus_n.forward_prop(xs, h0)
-                _, _, _, _, neg_h_next = neg_n.forward_prop(xs, h0)
-                exp_grad = np.sum((plus_h_next - neg_h_next) / (2 * t))
+                plus_h_last = plus_n.forward_prop(xs, h0, {})
+                neg_h_last = neg_n.forward_prop(xs, h0, {})
+                exp_grad = (err(plus_h_last) - err(neg_h_last)) / (2 * t)
                 num_grad = numerical_gradient[i]
 
                 self.assertTrue(abs(exp_grad - num_grad) < 0.01,
                                 "{}: {} not within threshold of {}".format(attribute, numerical_gradient[i], exp_grad))
         checks = {
-            "w_xf_g": dw_xf_g,
-            "w_hf_g": dw_hf_g,
-            "b_f_g": db_f_g,
-            "w_xi_g": dw_xi_g,
-            "w_hi_g": dw_hi_g,
-            "b_i_g": db_i_g,
-            "w_xc": dw_xc,
-            "w_hc": dw_hc,
-            "b_c": db_c
+            "w_xf_g": intermediate_results["dw_xf_g"],
+            "w_hf_g": intermediate_results["dw_hf_g"],
+            "b_f_g": intermediate_results["db_f_g"],
+            "w_xi_g": intermediate_results["dw_xi_g"],
+            "w_hi_g": intermediate_results["dw_hi_g"],
+            "b_i_g": intermediate_results["db_i_g"],
+            "w_xc": intermediate_results["dw_xc"],
+            "w_hc": intermediate_results["dw_hc"],
+            "b_c": intermediate_results["db_c"]
         }
 
         for attr, numerical_grad in checks.items():
             grad_check(attr, numerical_grad)
+
+        for i in np.ndindex(dh0.shape):
+            plus_h0 = np.copy(h0)
+            plus_h0[i] += t
+
+            neg_h0 = np.copy(h0)
+            neg_h0[i] -= t
+
+            plus_h_last = n.forward_prop(xs, plus_h0, {})
+            neg_h_last = n.forward_prop(xs, neg_h0, {})
+            exp_grad = (err(plus_h_last) - err(neg_h_last)) / (2 * t)
+            num_grad = dh0[i]
+
+            self.assertTrue(abs(exp_grad - num_grad) < 0.01,
+                            "h0: {} not within threshold of {}".format(dh0[i], exp_grad))
 
     def test_learn_word_vectors_from_char_vector_sequence(self):
         text = "please learn how to infer word vectors from sequences of character vectors"
@@ -141,7 +163,10 @@ class TestNoOutputLstm(unittest.TestCase):
 
         for i in range(1000):
             for char_vectors, word_vector in training_data:
-                n.train(char_vectors, np.zeros(len(index_to_word)), word_vector, 0.1)
+                intermediate_results = {}
+                h_last = n.forward_prop(char_vectors, np.zeros(len(index_to_word)), intermediate_results)
+                n.back_prop(ce_err_prime(h_last, word_vector), intermediate_results)
+                n.train_from_results(0.1, intermediate_results)
 
             if i % 200 == 0:
                 total_err = 0
@@ -169,9 +194,14 @@ class TestNoOutputLstm(unittest.TestCase):
             t = np.random.uniform(size=80)
             training_data.append((xs, h0, t))
 
-        epochs = 300
+        epochs = 100
         start = time.time()
-        n.train_from_data(training_data, 0.1, epochs=epochs)
+        for _ in range(epochs):
+            for xs, h0, t in training_data:
+                intermediate_results = {}
+                h_last = n.forward_prop(xs, h0, intermediate_results)
+                n.back_prop(ce_err_prime(h_last, t), intermediate_results)
+                n.train_from_results(0.1, intermediate_results)
         end = time.time()
         time_taken = end - start
 

@@ -17,5 +17,13 @@ def mean_squared_error(y, t):
     return 0.5 * np.sum(np.square(t - y)) * (1 / len(y))
 
 
+def mse(y, t):
+    return mean_squared_error(y, t)
+
+
 def mean_squared_error_prime(y, t):
     return (y - t) / len(y)
+
+
+def mse_prime(y, t):
+    return mean_squared_error(y, t)
