@@ -1,4 +1,4 @@
 from .feedforwardnetwork import FeedForwardNetwork
-from .lstm import NoOutputLstm
+from .nooutputlstm import NoOutputLstm
 
 __all__ = ["network", "iterutils", "mathutils"]

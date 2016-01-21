@@ -1,4 +1,3 @@
-import random
 import numpy as np
 from .mathutils import sigmoid, sigmoid_prime, tanh_prime
 
@@ -137,24 +136,3 @@ class NoOutputLstm:
         self.w_xc -= intermediate_results["dw_xc"] * learning_rate
         self.w_hc -= intermediate_results["dw_hc"] * learning_rate
         self.b_c -= intermediate_results["db_c"] * learning_rate
-
-    # def train_from_data(self, training_data, learning_rate, epochs=1):
-    #     for _ in range(epochs):
-    #         def compute_deltas(training_example):
-    #             xs, h0, t = training_example
-    #             hs, f_gs, i_gs, cs, h = self.forward_prop(xs, h0)
-    #             dh = h - t
-    #             return self.back_prop(xs, hs, f_gs, i_gs, cs, dh)
-    #
-    #         deltas = map(compute_deltas, random.sample(training_data, min(len(training_data), 10)))
-    #
-    #         for dw_xf_g, dw_hf_g, db_f_g, dw_xi_g, dw_hi_g, db_i_g, dw_xc, dw_hc, db_c in deltas:
-    #             self.w_xf_g -= dw_xf_g * learning_rate
-    #             self.w_hf_g -= dw_hf_g * learning_rate
-    #             self.b_f_g -= db_f_g * learning_rate
-    #             self.w_xi_g -= dw_xi_g * learning_rate
-    #             self.w_hi_g -= dw_hi_g * learning_rate
-    #             self.b_i_g -= db_i_g * learning_rate
-    #             self.w_xc -= dw_xc * learning_rate
-    #             self.w_hc -= dw_hc * learning_rate
-    #             self.b_c -= db_c * learning_rate
