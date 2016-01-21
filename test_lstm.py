@@ -13,16 +13,20 @@ def derr(y):
 
 
 class TestNoOutputLstm(unittest.TestCase):
-    def test_step_gradients(self):
+    def test_single_step_gradients(self):
         t = 1e-4
 
-        x = np.random.randn(4)
-        h_prev = np.random.randn(5)
+        input_size = 4
+        hidden_size = 5
 
-        n = NoOutputLstm(len(x), len(h_prev))
+        xs = [np.random.uniform(size=input_size)]
+        h0 = np.random.uniform(size=hidden_size)
 
-        h_next, f_g, i_g, c = n._step(x, h_prev)
-        dw_xf_g, dw_hf_g, db_f_g, dw_xi_g, dw_hi_g, db_i_g, dw_xc, dw_hc, db_c, dh_prev = n._back_step(x, h_prev, f_g, i_g, c, derr(h_next))
+        n = NoOutputLstm(input_size, hidden_size)
+
+        intermediate_results = {}
+        h_next = n.forward_prop(xs, h0, intermediate_results)
+        dh_prev = n.back_prop(derr(h_next), intermediate_results)
 
         def grad_check(attribute, numerical_gradient):
             for i in np.ndindex(numerical_gradient.shape):
@@ -32,36 +36,36 @@ class TestNoOutputLstm(unittest.TestCase):
                 neg_n = n.clone()
                 getattr(neg_n, attribute)[i] -= t
 
-                plus_h_next, _, _, _ = plus_n._step(x, h_prev)
-                neg_h_next, _, _, _ = neg_n._step(x, h_prev)
+                plus_h_next = plus_n.forward_prop(xs, h0, {})
+                neg_h_next = neg_n.forward_prop(xs, h0, {})
                 exp_grad = np.sum((err(plus_h_next) - err(neg_h_next)) / (2 * t))
 
                 self.assertTrue(abs(exp_grad - numerical_gradient[i]) < 0.01,
                                 "{}: {} not within threshold of {}".format(attribute, numerical_gradient[i], exp_grad))
         checks = {
-            "w_xf_g": dw_xf_g,
-            "w_hf_g": dw_hf_g,
-            "b_f_g": db_f_g,
-            "w_xi_g": dw_xi_g,
-            "w_hi_g": dw_hi_g,
-            "b_i_g": db_i_g,
-            "w_xc": dw_xc,
-            "w_hc": dw_hc,
-            "b_c": db_c
+            "w_xf_g": intermediate_results["dw_xf_g"],
+            "w_hf_g": intermediate_results["dw_hf_g"],
+            "b_f_g": intermediate_results["db_f_g"],
+            "w_xi_g": intermediate_results["dw_xi_g"],
+            "w_hi_g": intermediate_results["dw_hi_g"],
+            "b_i_g": intermediate_results["db_i_g"],
+            "w_xc": intermediate_results["dw_xc"],
+            "w_hc": intermediate_results["dw_hc"],
+            "b_c": intermediate_results["db_c"]
         }
 
         for attr, numerical_grad in checks.items():
             grad_check(attr, numerical_grad)
 
         for i in np.ndindex(dh_prev.shape):
-            hprev_plus = np.copy(h_prev)
+            hprev_plus = np.copy(h0)
             hprev_plus[i] += t
 
-            hprev_minus = np.copy(h_prev)
+            hprev_minus = np.copy(h0)
             hprev_minus[i] -= t
 
-            plus_h1, _, _, _ = n._step(x, hprev_plus)
-            neg_h1, _, _, _ = n._step(x, hprev_minus)
+            plus_h1 = n.forward_prop(xs, hprev_plus, {})
+            neg_h1 = n.forward_prop(xs, hprev_minus, {})
             exp_dh_prev = ((err(plus_h1) - err(neg_h1)) / (2 * t))
 
             self.assertTrue(abs(exp_dh_prev - dh_prev[i]) < 0.01,
