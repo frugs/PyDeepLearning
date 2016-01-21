@@ -166,7 +166,7 @@ class TestNoOutputLstm(unittest.TestCase):
                 intermediate_results = {}
                 h_last = n.forward_prop(char_vectors, np.zeros(len(index_to_word)), intermediate_results)
                 n.back_prop(ce_err_prime(h_last, word_vector), intermediate_results)
-                n.train_from_results(0.1, intermediate_results)
+                n.train(0.1, intermediate_results)
 
             if i % 200 == 0:
                 total_err = 0
@@ -201,7 +201,7 @@ class TestNoOutputLstm(unittest.TestCase):
                 intermediate_results = {}
                 h_last = n.forward_prop(xs, h0, intermediate_results)
                 n.back_prop(ce_err_prime(h_last, t), intermediate_results)
-                n.train_from_results(0.1, intermediate_results)
+                n.train(0.1, intermediate_results)
         end = time.time()
         time_taken = end - start
 

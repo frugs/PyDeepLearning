@@ -42,7 +42,7 @@ class TestLstmFeedForward(unittest.TestCase):
             for char_vectors, word_vector in training_data:
                 hs, f_gs, i_gs, cs, lstm_output = lstm.forward_prop(char_vectors, h0)
                 res = {}
-                y = ffn.y(lstm_output, res)
+                y = ffn.forward_prop(lstm_output, res)
                 # dy = mathutils.mean_squared_error_prime(y, word_vector)
                 dy = mathutils.mean_squared_error_prime(lstm_output, word_vector)
                 dx = ffn.dx(lstm_output, dy, res)
@@ -65,12 +65,12 @@ class TestLstmFeedForward(unittest.TestCase):
                 total_err = 0
                 for char_vectors, word_vector in training_data:
                     h = lstm.activate(char_vectors, h0)
-                    output_vector = ffn.y(h[-1], {})
+                    output_vector = ffn.forward_prop(h[-1], {})
                     total_err += mathutils.mean_squared_error(output_vector, word_vector)
                 print(total_err/len(training_data))
 
         lstm_out = lstm.activate(to_char_vector_sequence("infer"), h0)
-        result = ffn.y(lstm_out, {})
+        result = ffn.forward_prop(lstm_out, {})
 
         self.assertEquals("infer", index_to_word[np.argmax(result)])
 
@@ -117,7 +117,7 @@ class TestLstmFeedForward(unittest.TestCase):
             for char_vectors, word_vector in training_data:
                 hs, f_gs, i_gs, cs, h = lstm.forward_prop(char_vectors, h0)
                 res = {}
-                y = ffn.y(h, res)
+                y = ffn.forward_prop(h, res)
                 dy = mathutils.mean_squared_error(y, word_vector)
                 dx = ffn.dx(h, dy, res)
                 ffn.train(learning_rate, h, dy, res)
@@ -137,10 +137,10 @@ class TestLstmFeedForward(unittest.TestCase):
                 total_err = 0
                 for char_vectors, word_vector in training_data:
                     h = lstm.activate(char_vectors, h0)
-                    y = ffn.y(h, {})
+                    y = ffn.forward_prop(h, {})
                     total_err += mathutils.mean_squared_error(y, word_vector)
                 print(total_err/len(training_data))
 
         h = lstm.activate(to_char_vector_sequence("infer"), h0)
-        y = ffn.y(h, {})
+        y = ffn.forward_prop(h, {})
         self.assertEquals("infer", index_to_word[np.argmax(y)])

@@ -1,40 +1,9 @@
-from collections import namedtuple
-
-import theano
-import theano.tensor as T
 import numpy as np
 from . import iterutils, mathutils
 
 
-# import iterutils
-
-
-def farray(arr):
-    return np.array(arr).astype("float64")
-
-
 def frand(size=None):
-    return np.random.uniform(-1, 1, size=size).astype("float64")
-
-
-t_x, t_b = T.fvectors("x", "b")
-t_w = T.fmatrix("w")
-
-t_activation = T.dot(t_x, t_w) + t_b
-t_y = 1 / (1 + T.exp(-t_activation))
-
-tf_activate = theano.function(inputs=[t_x, t_w, t_b], outputs=[t_y])
-
-t_w2, t_x2 = T.fmatrices("w2", "x2")
-t_dy, t_sigmoid = T.fvectors("dy", "sigmoid")
-t_sigmoid_prime = t_sigmoid * (1 - t_sigmoid)
-t_dw = t_dy * t_sigmoid_prime * t_x2
-t_db = t_dy * t_sigmoid_prime
-t_dx = T.dot(t_w2, t_dy * t_sigmoid_prime)
-
-tf_dw = theano.function(inputs=[t_dy, t_sigmoid, t_x2], outputs=[t_dw])
-tf_db = theano.function(inputs=[t_dy, t_sigmoid], outputs=[t_db])
-tf_dx = theano.function(inputs=[t_dy, t_sigmoid, t_w2], outputs=[t_dx])
+    return np.random.uniform(-1, 1, size=size)
 
 
 class FeedForwardNetwork:
@@ -42,81 +11,60 @@ class FeedForwardNetwork:
         self.ws = [frand(size=(x_size, y_size)) for x_size, y_size in iterutils.window(layer_sizes, 2)]
         self.bs = [frand(size=y_size) for _, y_size in iterutils.window(layer_sizes, 2)]
 
-    def y(self, x0, intermediate_results):
+    def forward_prop(self, x0, intermediate_results):
         if "ys" not in intermediate_results:
             ys = []
             x = x0
 
             for w, b in zip(self.ws, self.bs):
-                # y = tf_activate(x, w, b)[0]
                 y = mathutils.sigmoid(np.dot(x, w) + b)
                 ys.append(y)
                 x = y
 
+            intermediate_results["x0"] = x0
             intermediate_results["ys"] = ys
 
         return intermediate_results["ys"][-1]
 
-    def dws(self, x0, dy, intermediate_results):
-        if "dws" not in intermediate_results:
-            dws = []
-            ys = intermediate_results["ys"]
-            xs = [x0] + ys[:-1]
+    def back_prop(self, dy, intermediate_results):
+        ys = intermediate_results["ys"]
+        x0 = intermediate_results["x0"]
 
-            self.dx(x0, dy, intermediate_results)
-            dxs = intermediate_results["dxs"]
-            dys = dxs[1:] + [dy]
+        dxs = []
+        dx = dy
+        for w, y in reversed(list(zip(self.ws, ys))):
+            dx = np.dot(w, dx * mathutils.sigmoid_prime(y))
+            dxs.append(dx)
 
-            for x, w, y, dy in reversed(list(zip(xs, self.ws, ys, dys))):
-                x2 = np.expand_dims(x, axis=1)
+        dxs.reverse()
+        intermediate_results["dxs"] = dxs
 
-                # dw = tf_dw(dy, y, x2.repeat(len(y), axis=1))[0]
-                dw = dy * mathutils.sigmoid_prime(y) * x2
-                dws.append(dw)
+        xs = [x0] + ys[:-1]
+        dys = dxs[1:] + [dy]
 
-            dws.reverse()
-            intermediate_results["dws"] = dws
+        dws = []
+        for x, w, y, dy in reversed(list(zip(xs, self.ws, ys, dys))):
+            x2 = np.expand_dims(x, axis=1)
 
-        return intermediate_results["dws"]
+            dw = dy * mathutils.sigmoid_prime(y) * x2
+            dws.append(dw)
 
-    def dbs(self, x0, dy, intermediate_results):
-        if "dbs" not in intermediate_results:
-            dbs = []
-            ys = intermediate_results["ys"]
+        dws.reverse()
+        intermediate_results["dws"] = dws
 
-            self.dx(x0, dy, intermediate_results)
-            dxs = intermediate_results["dxs"]
-            dys = dxs[1:] + [dy]
+        dbs = []
+        for w, y, dy in reversed(list(zip(self.ws, ys, dys))):
+            db = dy * mathutils.sigmoid_prime(y)
+            dbs.append(db)
 
-            for w, y, dy in reversed(list(zip(self.ws, ys, dys))):
-                # db = tf_db(dy, y)[0]
-                db = dy * mathutils.sigmoid_prime(y)
-                dbs.append(db)
+        dbs.reverse()
+        intermediate_results["dbs"] = dbs
 
-            dbs.reverse()
-            intermediate_results["dbs"] = dbs
+        return dxs[0]
 
-        return intermediate_results["dbs"]
-
-    def dx(self, x0, dy, intermediate_results):
-        if "dxs" not in intermediate_results:
-            dxs = []
-            ys = intermediate_results["ys"]
-
-            for w, y in reversed(list(zip(self.ws, ys))):
-                # dy = tf_dx(dy, y, w)[0]
-                dy = np.dot(w, dy * mathutils.sigmoid_prime(y))
-                dxs.append(dy)
-
-            dxs.reverse()
-            intermediate_results["dxs"] = dxs
-
-        return intermediate_results["dxs"][0]
-
-    def train(self, learning_rate, x0, dy, intermediate_results):
-        dws = self.dws(x0, dy, intermediate_results)
-        dbs = self.dbs(x0, dy, intermediate_results)
-        intermediate_results.clear()
+    def train(self, learning_rate, intermediate_results):
+        dws = intermediate_results["dws"]
+        dbs = intermediate_results["dbs"]
 
         for w, dw in zip(self.ws, dws):
             w -= dw * learning_rate

@@ -26,12 +26,13 @@ class TestFeedForwardNetwork(unittest.TestCase):
         n = FeedForwardNetwork([5, 4, 3, 2])
         x0 = np.random.uniform(size=5).astype(TYPE)
 
-        res = {}
-        y = n.y(x0, res)
+        intermediate_results = {}
+        y = n.forward_prop(x0, intermediate_results)
         t = np.zeros(2).astype(TYPE)
         dy = mathutils.mean_squared_error_prime(y, t)
+        n.back_prop(dy, intermediate_results)
 
-        dws = n.dws(x0, dy, res)
+        dws = intermediate_results["dws"]
 
         delta = 1e-4
 
@@ -46,7 +47,7 @@ class TestFeedForwardNetwork(unittest.TestCase):
                 n1.ws[i][index] -= delta
                 n2.ws[i][index] += delta
 
-                exp_grad = (err(n2.y(x0, {})) - err(n1.y(x0, {}))) / (2 * delta)
+                exp_grad = (err(n2.forward_prop(x0, {})) - err(n1.forward_prop(x0, {}))) / (2 * delta)
                 exp_dw[index] = exp_grad
 
             exp_dws.append(exp_dw)
@@ -58,12 +59,13 @@ class TestFeedForwardNetwork(unittest.TestCase):
         n = FeedForwardNetwork([4, 7, 2, 3])
         x0 = np.random.uniform(size=4).astype(TYPE)
 
-        res = {}
-        y = n.y(x0, res)
+        intermediate_results = {}
+        y = n.forward_prop(x0, intermediate_results)
         t = np.zeros(3).astype(TYPE)
         dy = mathutils.mean_squared_error_prime(y, t)
+        n.back_prop(dy, intermediate_results)
 
-        dbs = n.dbs(x0, dy, res)
+        dbs = intermediate_results["dbs"]
 
         delta = 1e-4
 
@@ -78,7 +80,7 @@ class TestFeedForwardNetwork(unittest.TestCase):
                 n1.bs[i][index] -= delta
                 n2.bs[i][index] += delta
 
-                exp_grad = (err(n2.y(x0, {})) - err(n1.y(x0, {}))) / (2 * delta)
+                exp_grad = (err(n2.forward_prop(x0, {})) - err(n1.forward_prop(x0, {}))) / (2 * delta)
                 exp_db[index] = exp_grad
 
             exp_dbs.append(exp_db)
@@ -90,11 +92,11 @@ class TestFeedForwardNetwork(unittest.TestCase):
         n = FeedForwardNetwork([3, 4, 4, 2])
         x0 = np.random.uniform(size=3).astype(TYPE)
 
-        res = {}
-        y = n.y(x0, res)
+        intermediate_results = {}
+        y = n.forward_prop(x0, intermediate_results)
         t = np.zeros(2).astype(TYPE)
         dy = mathutils.mean_squared_error_prime(y, t)
-        dx = n.dx(x0, dy, res)
+        dx = n.back_prop(dy, intermediate_results)
 
         delta = 1e-4
 
@@ -106,7 +108,7 @@ class TestFeedForwardNetwork(unittest.TestCase):
             x0_a[index] -= delta
             x0_b[index] += delta
 
-            exp_grad = (err(n.y(x0_b, {})) - err(n.y(x0_a, {}))) / (2 * delta)
+            exp_grad = (err(n.forward_prop(x0_b, {})) - err(n.forward_prop(x0_a, {}))) / (2 * delta)
             exp_dx[index] = exp_grad
 
         npt.assert_array_almost_equal(dx, exp_dx, decimal=3)
@@ -159,11 +161,12 @@ class TestFeedForwardNetwork(unittest.TestCase):
 
         for _ in range(10000):
             training_input, training_target = training_set[random.randrange(0, len(training_set))]
-            res = {}
-            y = n.y(training_input, res)
-            dy = mathutils.mean_squared_error_prime(y, training_target)
-            n.train(learning_rate, training_input, dy, res)
+            intermediate_results = {}
+            y = n.forward_prop(training_input, intermediate_results)
+            dy = mathutils.mse_prime(y, training_target)
+            n.back_prop(dy, intermediate_results)
+            n.train(learning_rate, intermediate_results)
 
-        errors = [mathutils.mean_squared_error(n.y(test_input, {}), test_target) for test_input, test_target in test_set]
+        errors = [mathutils.mean_squared_error(n.forward_prop(test_input, {}), test_target) for test_input, test_target in test_set]
         mean_squared_error = np.mean(np.square(errors))
         npt.assert_array_less(mean_squared_error, 0.05)

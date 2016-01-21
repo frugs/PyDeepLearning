@@ -126,7 +126,7 @@ class NoOutputLstm:
     def activate(self, xs, h0):
         return self.forward_prop(xs, h0, {})
 
-    def train_from_results(self, learning_rate, intermediate_results):
+    def train(self, learning_rate, intermediate_results):
         self.w_xf_g -= intermediate_results["dw_xf_g"] * learning_rate
         self.w_hf_g -= intermediate_results["dw_hf_g"] * learning_rate
         self.b_f_g -= intermediate_results["db_f_g"] * learning_rate
