@@ -1,5 +1,4 @@
 import unittest
-import time
 import numpy as np
 from pydl import Gru, mathutils
 

@@ -21,10 +21,12 @@ class Gru:
         self.b_h = frand(size=hidden_size)
 
     def forward_prop(self, xs, h0: np.ndarray, intermediate_results: dict):
-        rs = []
-        zs = []
-        h_tildes = []
-        hs = []
+        intermediate_results["h0"] = h0
+        intermediate_results["xs"] = xs
+        intermediate_results["rs"] = []
+        intermediate_results["zs"] = []
+        intermediate_results["h_tildes"] = []
+        intermediate_results["hs"] = []
 
         h = h0
         for x in xs:
@@ -33,19 +35,12 @@ class Gru:
             h_tilde = np.tanh(np.dot(x, self.w_hx) + np.dot(r * h, self.w_hh) + self.b_h)
             h = z * h + (1 - z) * h_tilde
 
-            rs.append(r)
-            zs.append(z)
-            h_tildes.append(h_tilde)
-            hs.append(h)
+            intermediate_results["rs"].append(r)
+            intermediate_results["zs"].append(z)
+            intermediate_results["h_tildes"].append(h_tilde)
+            intermediate_results["hs"].append(h)
 
-        intermediate_results["h0"] = h0
-        intermediate_results["xs"] = xs
-        intermediate_results["rs"] = rs
-        intermediate_results["zs"] = zs
-        intermediate_results["h_tildes"] = h_tildes
-        intermediate_results["hs"] = hs
-
-        return hs
+        return intermediate_results["hs"]
 
     def back_prop(self, dhs, intermediate_results):
         xs = intermediate_results["xs"]
