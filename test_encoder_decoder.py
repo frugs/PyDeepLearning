@@ -1,8 +1,7 @@
 import random
 import unittest
-import re
 import numpy as np
-from pydl import Gru, mathutils
+from pydl import Gru
 
 class TestEncoderDecoder(unittest.TestCase):
     def testTranslateWordsIntoInitialisms(self):
@@ -67,7 +66,7 @@ class TestEncoderDecoder(unittest.TestCase):
             training_set.append(([vector_from_word(word) for word in words],
                                  [vector_from_char(char) for char in initials]))
 
-        encoder_hidden_state_size = len(index_to_char)
+        encoder_hidden_state_size = 50
         encoder = Gru(len(index_to_word), encoder_hidden_state_size)
         decoder = Gru(len(index_to_char) + encoder_hidden_state_size, len(index_to_char))
 
@@ -77,25 +76,25 @@ class TestEncoderDecoder(unittest.TestCase):
         end_of_sequence = np.ones(len(index_to_char)) * -1
 
         for epoch in range(10000):
-            debug = epoch % 100 == 0
+            debug = epoch % 5000 == 0
             for word_vectors, char_vectors in random.sample(training_set, 30):
                 encoder_results = {}
                 encoded_state = encoder.forward_prop(word_vectors, encoder_h0, encoder_results)[-1]
 
                 decoder_results = {}
 
-                # FIXME!
-                def decoder_input_generator():
-                    yield np.zeros(len(index_to_char) + encoder_hidden_state_size)
+                def decoder_input_generator(max):
+                    yield np.concatenate([encoded_state, np.zeros(len(index_to_char))])
 
                     prev_h = decoder_results["hs"][-1]
                     resulting_char = char_from_vector(prev_h)
-                    if resulting_char is not " ":
-                        yield np.concatenate([vector_from_char(resulting_char), encoded_state])
 
-                # hs = decoder.forward_prop(decoder_input_generator(), decoder_h0, decoder_results)
-                hs = decoder.forward_prop(decoder_input_generator(), encoded_state, decoder_results)
+                    i = 0
+                    while resulting_char is not " " and i <= max:
+                        yield np.concatenate([encoded_state, vector_from_char(resulting_char)])
+                        i += 1
 
+                hs = decoder.forward_prop(decoder_input_generator(len(char_vectors)), decoder_h0, decoder_results)
                 if len(hs) <= len(char_vectors):
                     targets = char_vectors[:len(hs)]
                 else:
@@ -103,11 +102,10 @@ class TestEncoderDecoder(unittest.TestCase):
 
                 decoder_errors = [h - target for h, target in zip(hs, targets)]
 
-                encoded_state_error = decoder.back_prop(decoder_errors, decoder_results)
+                decoder.back_prop(decoder_errors, decoder_results)
                 decoder.train(0.1, decoder_results)
 
-                # FIXME!
-                # encoded_state_error = np.zeros(encoder_hidden_state_size)
+                encoded_state_error = decoder_results["dx"][:len(encoded_state)]
                 encoder_errors = ([np.zeros(encoder_hidden_state_size)] * (len(word_vectors) - 1)) + [encoded_state_error]
 
                 encoder.back_prop(encoder_errors, encoder_results)
@@ -117,6 +115,9 @@ class TestEncoderDecoder(unittest.TestCase):
                     print(" ".join([word_from_vector(word_vector) for word_vector in word_vectors]))
                     print("".join([char_from_vector(h) for h in hs]))
                     print(sum([np.sum(np.square(err)) for err in decoder_errors]))
+
+                    encoder.save("encoder")
+                    decoder.save("decoder")
                     debug = False
 
 

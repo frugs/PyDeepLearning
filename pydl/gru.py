@@ -22,7 +22,7 @@ class Gru:
 
     def forward_prop(self, xs, h0: np.ndarray, intermediate_results: dict):
         intermediate_results["h0"] = h0
-        intermediate_results["xs"] = xs
+        intermediate_results["xs"] = []
         intermediate_results["rs"] = []
         intermediate_results["zs"] = []
         intermediate_results["h_tildes"] = []
@@ -35,6 +35,7 @@ class Gru:
             h_tilde = np.tanh(np.dot(x, self.w_hx) + np.dot(r * h, self.w_hh) + self.b_h)
             h = z * h + (1 - z) * h_tilde
 
+            intermediate_results["xs"].append(x)
             intermediate_results["rs"].append(r)
             intermediate_results["zs"].append(z)
             intermediate_results["h_tildes"].append(h_tilde)
@@ -63,6 +64,8 @@ class Gru:
         intermediate_results["dw_hh"] = np.zeros(self.w_hh.shape)
         intermediate_results["db_h"] = np.zeros(self.b_h.shape)
 
+        intermediate_results["dx"] = np.zeros(xs[0].shape)
+
         dh_propagated = np.zeros(h0.shape)
         for x, h_prev, h_tilde, z, r, dh in reversed(list(zip(xs, h_prevs, h_tildes, zs, rs, dhs))):
             dh += dh_propagated
@@ -76,6 +79,7 @@ class Gru:
             dw_zh = db_z * np.expand_dims(h_prev, axis=1)
 
             dh_prev += np.dot(self.w_zh, db_z)
+            dx = np.dot(self.w_zx, db_z)
 
             dh_tilde = dh * (1 - z)
             db_h = dh_tilde * mathutils.tanh_prime(h_tilde)
@@ -83,6 +87,7 @@ class Gru:
             dw_hh = db_h * np.expand_dims(r * h_prev, axis=1)
 
             dh_prev += np.dot(self.w_hh, db_h) * r
+            dx += np.dot(self.w_hx, db_h)
 
             dr = np.dot(self.w_hh, db_h) * h_prev
             db_r = dr * mathutils.sigmoid_prime(r)
@@ -90,6 +95,7 @@ class Gru:
             dw_rh = db_r * np.expand_dims(h_prev, axis=1)
 
             dh_prev += np.dot(self.w_rh, db_r)
+            dx += np.dot(self.w_rx, db_r)
 
             intermediate_results["dw_rx"] += dw_rx
             intermediate_results["dw_rh"] += dw_rh
@@ -102,6 +108,7 @@ class Gru:
             intermediate_results["dw_hx"] += dw_hx
             intermediate_results["dw_hh"] += dw_hh
             intermediate_results["db_h"] += db_h
+            intermediate_results["dx"] += dx
 
             dh_propagated = dh_prev
 
@@ -119,3 +126,29 @@ class Gru:
         self.w_hx -= learning_rate * intermediate_results["dw_hx"]
         self.w_hh -= learning_rate * intermediate_results["dw_hh"]
         self.b_h -= learning_rate * intermediate_results["db_h"]
+
+    def save(self, file_name):
+        arrays = [
+            self.w_rx,
+            self.w_rh,
+            self.b_r,
+            self.w_zx,
+            self.w_zh,
+            self.b_z,
+            self.w_hx,
+            self.w_hh,
+            self.b_h
+        ]
+        np.savez_compressed(file_name, *arrays)
+
+    def load(self, file_name):
+        with np.load(file_name) as data:
+            self.w_rx = data["arr_0"]
+            self.w_rh = data["arr_1"]
+            self.b_r = data["arr_2"]
+            self.w_zx = data["arr_3"]
+            self.w_zh = data["arr_4"]
+            self.b_z = data["arr_5"]
+            self.w_hx = data["arr_6"]
+            self.w_hh = data["arr_7"]
+            self.b_h = data["arr_8"]
